@@ -1,0 +1,57 @@
+# OCI-specific Helm overrides for OKE deployment
+# Usage: helm install my-release ./deploy/helm/fullstack-app -f ./deploy/helm/fullstack-app/values-oci.yaml
+
+# ─── Backend ────────────────────────────────────────────────────────────────
+backend:
+  image:
+    # OCI Container Registry (OCIR) image path
+    # Format: <region>.ocir.io/<tenancy-namespace>/<repo>:<tag>
+    repository: YOUR_REGION.ocir.io/YOUR_TENANCY_NAMESPACE/file-service
+    tag: latest
+    pullPolicy: Always
+
+  replicaCount: 2
+
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "512Mi"
+    limits:
+      cpu: "1000m"
+      memory: "1Gi"
+
+  hsqldb:
+    storage:
+      size: 5Gi
+      # OKE block volume storage class
+      storageClassName: "oci-bv"
+      mountPath: /data
+
+  env:
+    SPRING_DATASOURCE_URL: "jdbc:hsqldb:file:/data/filedb;shutdown=true"
+    SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE: 10MB
+    SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE: 10MB
+
+# ─── Frontend ────────────────────────────────────────────────────────────────
+# Frontend is served from OCI Object Storage — no container needed in OKE.
+# Set replicaCount to 0 to skip the frontend deployment entirely.
+frontend:
+  image:
+    repository: YOUR_REGION.ocir.io/YOUR_TENANCY_NAMESPACE/frontend-client
+    tag: latest
+    pullPolicy: Always
+
+  replicaCount: 0
+
+  ingress:
+    enabled: false
+
+# ─── Image pull secret for OCIR ─────────────────────────────────────────────
+# Create the secret first:
+#   kubectl create secret docker-registry ocir-secret \
+#     --docker-server=YOUR_REGION.ocir.io \
+#     --docker-username='YOUR_TENANCY_NAMESPACE/YOUR_OCI_USERNAME' \
+#     --docker-password='YOUR_OCI_AUTH_TOKEN'
+imagePullSecrets:
+  - name: ocir-secret

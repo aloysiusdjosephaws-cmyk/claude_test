@@ -1,16 +1,19 @@
 # File Service — Full-Stack App
 
-A Spring Boot + Angular file upload/download application backed by HSQLDB, deployable via Docker Compose or Kubernetes (Helm).
+A Spring Boot + Angular file upload/download application backed by HSQLDB, deployable via Docker Compose, Kubernetes (Helm/OKE), or OCI (Object Storage + API Gateway + Container Instances).
 
 ## Stack
 
-| Layer      | Technology                                  |
-|------------|---------------------------------------------|
-| Backend    | Spring Boot 3.2, Java 17, Maven             |
-| Frontend   | Angular 19, Standalone Components, Nginx    |
-| Database   | HSQLDB (file-based)                         |
-| Container  | Docker Compose                              |
-| Kubernetes | Helm 3 chart (`deploy/helm/fullstack-app`)  |
+| Layer          | Technology                                            |
+|----------------|-------------------------------------------------------|
+| Backend        | Spring Boot 3.2, Java 17, Maven                       |
+| Frontend       | Angular 19, Standalone Components                     |
+| Database       | HSQLDB (file-based)                                   |
+| Container      | Docker Compose                                        |
+| Kubernetes     | Helm 3 chart (`deploy/helm/fullstack-app`)            |
+| OCI Frontend   | OCI Object Storage (static hosting)                   |
+| OCI Routing    | OCI API Gateway                                       |
+| OCI Backend    | OCI Container Registry + OKE (Kubernetes Engine)      |
 
 ---
 
@@ -19,11 +22,17 @@ A Spring Boot + Angular file upload/download application backed by HSQLDB, deplo
 ```
 .
 ├── docker-compose.yml
+├── scripts/
+│   ├── push-images-oci.sh        ← build + push to OCIR
+│   └── deploy-frontend-oci.sh    ← build Angular + upload to OCI Object Storage
 ├── deploy/
+│   ├── oci/
+│   │   └── api-gateway-spec.json ← OCI API Gateway deployment routes
 │   └── helm/
 │       └── fullstack-app/
 │           ├── Chart.yaml
 │           ├── values.yaml
+│           ├── values-oci.yaml   ← OKE overrides (OCIR images, oci-bv storage)
 │           └── templates/
 │               ├── backend-pvc.yaml
 │               ├── backend-deployment.yaml
@@ -43,10 +52,14 @@ A Spring Boot + Angular file upload/download application backed by HSQLDB, deplo
 └── frontend/
     ├── Dockerfile
     ├── nginx.conf
-    ├── proxy.conf.json          ← used by ng serve (local dev only)
-    └── src/app/
-        ├── app.component.ts
-        └── services/file.service.ts
+    ├── proxy.conf.json               ← used by ng serve (local dev only)
+    └── src/
+        ├── environments/
+        │   ├── environment.ts        ← apiUrl = /api  (proxied locally)
+        │   └── environment.prod.ts   ← apiUrl = OCI API Gateway URL
+        └── app/
+            ├── app.component.ts
+            └── services/file.service.ts
 ```
 
 ---
@@ -369,3 +382,157 @@ Key settings in `backend/src/main/resources/application.properties`:
 | `server.port` | `8080` |
 
 CORS is enabled for `http://localhost:4200` via `@CrossOrigin` on `FileController`.
+In OCI production, CORS is handled by the API Gateway (`deploy/oci/api-gateway-spec.json`).
+
+---
+
+## Option D — OCI Deployment
+
+### Architecture
+
+```
+Browser
+  │
+  ├── Static files ──► OCI Object Storage bucket (Angular SPA)
+  │
+  └── API calls ──► OCI API Gateway
+                        │
+                        └── /files/* ──► file-service (OKE / Container Instance)
+                                              │
+                                              └── HSQLDB on OCI Block Volume (PVC)
+```
+
+### Prerequisites
+
+| Tool | Install | Check |
+|------|---------|-------|
+| OCI CLI | `pip install oci-cli` | `oci --version` |
+| Docker | docker.com | `docker version` |
+| Helm 3 | helm.sh | `helm version` |
+| kubectl + OKE config | OCI Console → OKE → Access Cluster | `kubectl cluster-info` |
+| Node 20+ | nodejs.org | `node -v` |
+
+Configure the OCI CLI once:
+```bash
+oci setup config
+```
+
+---
+
+### Step 1 — Configure Angular for OCI API Gateway
+
+Edit `frontend/src/environments/environment.prod.ts` and set your API Gateway URL:
+
+```typescript
+export const environment = {
+  production: true,
+  apiUrl: 'https://YOUR_GATEWAY_ID.apigateway.YOUR_REGION.oci.customer-oci.com/v1'
+};
+```
+
+**Test the production build locally before deploying:**
+
+```bash
+cd frontend
+npm install
+npm run build:prod
+
+# Serve locally to verify the build works
+npx http-server dist/frontend-client/browser -p 8090
+# Open http://localhost:8090 — note: API calls will fail until gateway is live
+```
+
+---
+
+### Step 2 — Push images to OCI Container Registry (OCIR)
+
+```bash
+export OCI_REGION=ap-sydney-1
+export OCI_TENANCY_NAMESPACE=mytenancy
+export OCI_USERNAME=myuser@example.com
+export OCI_AUTH_TOKEN=your-auth-token    # OCI Console → User → Auth Tokens
+
+./scripts/push-images-oci.sh latest
+```
+
+---
+
+### Step 3 — Deploy backend to OKE
+
+```bash
+# Download kubeconfig from OCI Console → OKE → your cluster → Access Cluster
+export KUBECONFIG=~/.kube/oci-config
+
+# Create OCIR pull secret
+kubectl create secret docker-registry ocir-secret \
+  --docker-server="${OCI_REGION}.ocir.io" \
+  --docker-username="${OCI_TENANCY_NAMESPACE}/${OCI_USERNAME}" \
+  --docker-password="${OCI_AUTH_TOKEN}"
+
+# Install with OCI-specific values
+helm upgrade --install my-release ./deploy/helm/fullstack-app \
+  -f ./deploy/helm/fullstack-app/values-oci.yaml \
+  --set backend.image.repository="${OCI_REGION}.ocir.io/${OCI_TENANCY_NAMESPACE}/file-service" \
+  --set backend.image.tag=latest
+```
+
+Get the backend LoadBalancer IP (used in the API Gateway spec):
+
+```bash
+kubectl get svc my-release-fullstack-app-backend
+# Note the EXTERNAL-IP — this is FILE_SERVICE_LB_IP
+```
+
+---
+
+### Step 4 — Create OCI API Gateway
+
+In OCI Console → API Management → Gateways → Create Gateway, then:
+
+1. Edit `deploy/oci/api-gateway-spec.json` — replace `FILE_SERVICE_LB_IP` with the LoadBalancer IP from Step 3, and update `allowedOrigins` with your Object Storage bucket URL.
+
+2. Create a Deployment using the spec:
+
+```bash
+oci api-gateway deployment create \
+  --gateway-id YOUR_GATEWAY_OCID \
+  --display-name file-service-deployment \
+  --path-prefix /v1 \
+  --specification file://deploy/oci/api-gateway-spec.json \
+  --region "${OCI_REGION}"
+```
+
+3. Note the Gateway hostname — update `environment.prod.ts` with it and rebuild/redeploy the frontend.
+
+---
+
+### Step 5 — Deploy Angular to OCI Object Storage
+
+Create a public bucket in OCI Console → Object Storage → Create Bucket (enable "Emit Object Events", visibility: Public).
+
+```bash
+export OCI_NAMESPACE=mytenancy
+export OCI_BUCKET=my-frontend-bucket
+export OCI_REGION=ap-sydney-1
+
+./scripts/deploy-frontend-oci.sh
+```
+
+Access the app at:
+```
+https://objectstorage.YOUR_REGION.oraclecloud.com/n/NAMESPACE/b/BUCKET/o/index.html
+```
+
+---
+
+### Local testing of OCI components (no cloud needed)
+
+| Component | Local test |
+|-----------|-----------|
+| Backend | `cd backend && mvn spring-boot:run` → `curl localhost:8080/actuator/health` |
+| Frontend dev | `cd frontend && ng serve --proxy-config proxy.conf.json` |
+| Frontend prod build | `npm run build:prod` → `npx http-server dist/frontend-client/browser -p 8090` |
+| Helm chart lint | `helm lint ./deploy/helm/fullstack-app` |
+| Helm OCI values | `helm template my-release ./deploy/helm/fullstack-app -f ./deploy/helm/fullstack-app/values-oci.yaml` |
+| API Gateway spec | `oci api-gateway deployment create --dry-run ...` or validate JSON with `python -m json.tool deploy/oci/api-gateway-spec.json` |
+

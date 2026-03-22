@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 export interface FileMeta {
   id: number;
@@ -10,7 +11,7 @@ export interface FileMeta {
 
 @Injectable({ providedIn: 'root' })
 export class FileService {
-  private api = '/api/files';
+  private api = `${environment.apiUrl}/files`;
 
   constructor(private http: HttpClient) {}
 
