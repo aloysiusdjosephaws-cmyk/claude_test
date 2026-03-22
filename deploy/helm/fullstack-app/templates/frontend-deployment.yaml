@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "fullstack-app.fullname" . }}-frontend
+  labels:
+    {{- include "fullstack-app.labels" . | nindent 4 }}
+    {{- include "fullstack-app.frontend.selectorLabels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "fullstack-app.frontend.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "fullstack-app.frontend.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: frontend
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}
+          env:
+            - name: BACKEND_URL
+              value: "http://{{ include "fullstack-app.fullname" . }}-backend:{{ .Values.backend.service.port }}"

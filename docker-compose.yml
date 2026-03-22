@@ -1,0 +1,33 @@
+version: '3.9'
+
+services:
+  backend-service:
+    build:
+      context: ./backend
+    container_name: backend-service
+    ports:
+      - "8080:8080"
+    volumes:
+      - hsqldb-data:/data
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:hsqldb:file:/data/filedb;shutdown=true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  frontend-client:
+    build:
+      context: ./frontend
+    container_name: frontend-client
+    ports:
+      - "4200:80"
+    depends_on:
+      backend-service:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  hsqldb-data:

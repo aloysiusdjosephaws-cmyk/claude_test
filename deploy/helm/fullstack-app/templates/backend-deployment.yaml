@@ -1,0 +1,52 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "fullstack-app.fullname" . }}-backend
+  labels:
+    {{- include "fullstack-app.labels" . | nindent 4 }}
+    {{- include "fullstack-app.backend.selectorLabels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.backend.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "fullstack-app.backend.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "fullstack-app.backend.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: backend
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            {{- range $key, $val := .Values.backend.env }}
+            - name: {{ $key }}
+              value: {{ $val | quote }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+          volumeMounts:
+            - name: hsqldb-storage
+              mountPath: {{ .Values.backend.hsqldb.storage.mountPath }}
+      volumes:
+        - name: hsqldb-storage
+          persistentVolumeClaim:
+            claimName: {{ include "fullstack-app.fullname" . }}-hsqldb
