@@ -1,0 +1,77 @@
+version: 0.1
+component: build
+timeoutInSeconds: 1800
+shell: bash
+
+# Parameters are injected by the ORM null_resource when triggering this pipeline.
+env:
+  variables:
+    REGION: ""
+    TENANCY_NAMESPACE: ""
+    BACKEND_IMAGE_REPO: ""
+    IMAGE_TAG: "latest"
+    SOURCE_BUCKET: ""
+    DEVOPS_GIT_USERNAME: ""
+    AUTH_TOKEN: ""
+
+steps:
+  - type: Command
+    name: "Install tools"
+    timeoutInSeconds: 300
+    command: |
+      set -euo pipefail
+      echo "==> [backend] Installing tools..."
+      yum install -y unzip python3 wget -q 2>/dev/null || true
+      echo "    Docker version: $(docker --version)"
+      echo "    OCI CLI version: $(oci --version)"
+
+  - type: Command
+    name: "Download app source from Object Storage"
+    timeoutInSeconds: 120
+    command: |
+      set -euo pipefail
+      echo "==> [backend] Downloading app source from Object Storage..."
+      echo "    Bucket: ${SOURCE_BUCKET}, Namespace: ${TENANCY_NAMESPACE}"
+      mkdir -p /workspace/app
+      oci os object get \
+        --namespace "${TENANCY_NAMESPACE}" \
+        --bucket-name "${SOURCE_BUCKET}" \
+        --name "app_source.zip" \
+        --file /tmp/app_source.zip \
+        --auth resource_principal
+      echo "    Extracting source..."
+      unzip -q /tmp/app_source.zip -d /workspace/app
+      ls /workspace/app/
+
+  - type: Command
+    name: "Docker login to OCIR"
+    timeoutInSeconds: 60
+    command: |
+      set -euo pipefail
+      echo "==> [backend] Logging in to OCIR..."
+      echo "${AUTH_TOKEN}" | docker login "${REGION}.ocir.io" \
+        --username "${TENANCY_NAMESPACE}/${DEVOPS_GIT_USERNAME}" \
+        --password-stdin
+      echo "    Login successful."
+
+  - type: Command
+    name: "Build backend Docker image (multi-stage: Maven + JRE)"
+    timeoutInSeconds: 1200
+    command: |
+      set -euo pipefail
+      echo "==> [backend] Building Docker image..."
+      echo "    Image: ${BACKEND_IMAGE_REPO}:${IMAGE_TAG}"
+      docker build \
+        --tag "${BACKEND_IMAGE_REPO}:${IMAGE_TAG}" \
+        /workspace/app/backend/
+      echo "    Build complete."
+
+  - type: Command
+    name: "Push backend image to OCIR"
+    timeoutInSeconds: 300
+    command: |
+      set -euo pipefail
+      echo "==> [backend] Pushing image to OCIR..."
+      docker push "${BACKEND_IMAGE_REPO}:${IMAGE_TAG}"
+      echo "    Push complete."
+      echo "    Image: ${BACKEND_IMAGE_REPO}:${IMAGE_TAG}"

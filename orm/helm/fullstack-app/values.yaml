@@ -1,0 +1,67 @@
+# ─── Backend ────────────────────────────────────────────────────────────────
+backend:
+  image:
+    repository: backend-service
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  service:
+    type: ClusterIP          # Override to LoadBalancer in OCI (values-oci.yaml)
+    port: 8080
+
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+  hsqldb:
+    storage:
+      size: 1Gi
+      storageClassName: ""   # leave empty to use cluster default
+      mountPath: /data
+
+  env:
+    SPRING_DATASOURCE_URL: "jdbc:hsqldb:file:/data/filedb;shutdown=true"
+    SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE: 10MB
+    SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE: 10MB
+
+# ─── Frontend ────────────────────────────────────────────────────────────────
+frontend:
+  image:
+    repository: frontend-client
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  service:
+    type: ClusterIP
+    port: 80
+
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "64Mi"
+    limits:
+      cpu: "200m"
+      memory: "128Mi"
+
+  ingress:
+    enabled: true
+    className: ""
+    host: localhost
+    path: /
+    pathType: Prefix
+    annotations: {}
+    tls: []
+
+# ─── Global ──────────────────────────────────────────────────────────────────
+nameOverride: ""
+fullnameOverride: ""
+imagePullSecrets: []

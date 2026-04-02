@@ -1,0 +1,166 @@
+version: 0.1
+component: build
+timeoutInSeconds: 1800
+shell: bash
+
+# Parameters are injected by the ORM null_resource when triggering this pipeline.
+env:
+  variables:
+    REGION: ""
+    TENANCY_NAMESPACE: ""
+    FRONTEND_IMAGE_REPO: ""
+    IMAGE_TAG: "latest"
+    SOURCE_BUCKET: ""
+    FRONTEND_BUCKET: ""
+    API_GATEWAY_URL: ""
+    DEVOPS_GIT_USERNAME: ""
+    AUTH_TOKEN: ""
+
+steps:
+  - type: Command
+    name: "Install tools (Node.js, unzip)"
+    timeoutInSeconds: 300
+    command: |
+      set -euo pipefail
+      echo "==> [frontend] Installing Node.js and tools..."
+
+      # Install Node.js 20 via nvm (works on OL7 without root)
+      export NVM_DIR="$HOME/.nvm"
+      if [ ! -d "${NVM_DIR}" ]; then
+        curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+      fi
+      source "${NVM_DIR}/nvm.sh"
+      nvm install 20
+      nvm use 20
+      node --version
+      npm --version
+
+      # Other tools
+      yum install -y unzip -q 2>/dev/null || true
+      echo "    Docker version: $(docker --version)"
+
+  - type: Command
+    name: "Download app source from Object Storage"
+    timeoutInSeconds: 120
+    command: |
+      set -euo pipefail
+      echo "==> [frontend] Downloading app source from Object Storage..."
+      mkdir -p /workspace/app
+      oci os object get \
+        --namespace "${TENANCY_NAMESPACE}" \
+        --bucket-name "${SOURCE_BUCKET}" \
+        --name "app_source.zip" \
+        --file /tmp/app_source.zip \
+        --auth resource_principal
+      unzip -q /tmp/app_source.zip -d /workspace/app
+      ls /workspace/app/frontend/
+
+  - type: Command
+    name: "Inject API Gateway URL into Angular environment"
+    timeoutInSeconds: 30
+    command: |
+      set -euo pipefail
+      echo "==> [frontend] Setting API Gateway URL: ${API_GATEWAY_URL}"
+      cat > /workspace/app/frontend/src/environments/environment.prod.ts << 'TSEOF'
+      export const environment = {
+        production: true,
+        apiUrl: 'API_GW_PLACEHOLDER'
+      };
+      TSEOF
+      # Replace placeholder with actual URL
+      sed -i "s|API_GW_PLACEHOLDER|${API_GATEWAY_URL}|g" \
+        /workspace/app/frontend/src/environments/environment.prod.ts
+
+      echo "    Updated environment.prod.ts:"
+      cat /workspace/app/frontend/src/environments/environment.prod.ts
+
+  - type: Command
+    name: "npm install"
+    timeoutInSeconds: 600
+    command: |
+      set -euo pipefail
+      source "${HOME}/.nvm/nvm.sh"
+      nvm use 20
+      echo "==> [frontend] Installing npm dependencies..."
+      cd /workspace/app/frontend
+      npm ci --legacy-peer-deps
+      echo "    Dependencies installed."
+
+  - type: Command
+    name: "Angular production build"
+    timeoutInSeconds: 600
+    command: |
+      set -euo pipefail
+      source "${HOME}/.nvm/nvm.sh"
+      nvm use 20
+      echo "==> [frontend] Building Angular production bundle..."
+      cd /workspace/app/frontend
+      npx ng build --configuration production
+      echo "    Build output:"
+      ls dist/frontend-client/browser/
+
+  - type: Command
+    name: "Upload Angular build to Object Storage"
+    timeoutInSeconds: 300
+    command: |
+      set -euo pipefail
+      echo "==> [frontend] Uploading static files to Object Storage bucket: ${FRONTEND_BUCKET}"
+      DIST_DIR="/workspace/app/frontend/dist/frontend-client/browser"
+
+      get_content_type() {
+        case "$1" in
+          *.html)  echo "text/html" ;;
+          *.js)    echo "application/javascript" ;;
+          *.css)   echo "text/css" ;;
+          *.json)  echo "application/json" ;;
+          *.ico)   echo "image/x-icon" ;;
+          *.png)   echo "image/png" ;;
+          *.svg)   echo "image/svg+xml" ;;
+          *.woff2) echo "font/woff2" ;;
+          *.woff)  echo "font/woff" ;;
+          *.ttf)   echo "font/ttf" ;;
+          *.map)   echo "application/json" ;;
+          *)       echo "application/octet-stream" ;;
+        esac
+      }
+
+      find "${DIST_DIR}" -type f | while read -r FILE; do
+        OBJ_NAME="${FILE#${DIST_DIR}/}"
+        CONTENT_TYPE=$(get_content_type "${FILE}")
+        echo "    Uploading: ${OBJ_NAME} (${CONTENT_TYPE})"
+        oci os object put \
+          --namespace "${TENANCY_NAMESPACE}" \
+          --bucket-name "${FRONTEND_BUCKET}" \
+          --name "${OBJ_NAME}" \
+          --file "${FILE}" \
+          --content-type "${CONTENT_TYPE}" \
+          --force \
+          --auth resource_principal
+      done
+
+      echo "    All files uploaded."
+      echo "    Frontend URL: https://objectstorage.${REGION}.oraclecloud.com/n/${TENANCY_NAMESPACE}/b/${FRONTEND_BUCKET}/o/index.html"
+
+  - type: Command
+    name: "Docker login to OCIR"
+    timeoutInSeconds: 60
+    command: |
+      set -euo pipefail
+      echo "==> [frontend] Logging in to OCIR..."
+      echo "${AUTH_TOKEN}" | docker login "${REGION}.ocir.io" \
+        --username "${TENANCY_NAMESPACE}/${DEVOPS_GIT_USERNAME}" \
+        --password-stdin
+
+  - type: Command
+    name: "Build frontend Docker image (Nginx)"
+    timeoutInSeconds: 600
+    command: |
+      set -euo pipefail
+      echo "==> [frontend] Building frontend Docker image..."
+      # Re-use the pre-built dist directory by copying it to the Docker context
+      # so the multi-stage Dockerfile doesn't re-run npm build inside Docker.
+      docker build \
+        --tag "${FRONTEND_IMAGE_REPO}:${IMAGE_TAG}" \
+        /workspace/app/frontend/
+      docker push "${FRONTEND_IMAGE_REPO}:${IMAGE_TAG}"
+      echo "    Frontend image pushed: ${FRONTEND_IMAGE_REPO}:${IMAGE_TAG}"

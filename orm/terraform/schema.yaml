@@ -1,0 +1,159 @@
+title: "File Service — Full-Stack OCI Deployment"
+description: "Deploys Spring Boot + Angular file upload service to OCI: OKE (backend), Object Storage (frontend), API Gateway, OCIR, DevOps CI/CD pipelines. No manual console work required."
+schemaVersion: 1.1.0
+version: "20240101"
+locale: en
+
+variableGroups:
+  - title: "OCI Identity & Region"
+    visible: true
+    variables:
+      - tenancy_ocid
+      - compartment_ocid
+      - region
+
+  - title: "Authentication"
+    visible: true
+    variables:
+      - auth_token
+      - devops_git_username
+
+  - title: "OKE Cluster Configuration"
+    visible: true
+    variables:
+      - ssh_public_key
+      - kubernetes_version
+      - node_shape
+      - node_ocpus
+      - node_memory_gb
+      - node_count
+
+  - title: "Application Settings"
+    visible: true
+    variables:
+      - app_name
+      - image_tag
+
+variables:
+  tenancy_ocid:
+    title: "Tenancy OCID"
+    description: "OCID of your OCI tenancy. Found in: OCI Console → Profile → Tenancy."
+    type: oci:identity:tenancy:id
+    required: true
+
+  compartment_ocid:
+    title: "Compartment"
+    description: "Compartment where all resources will be created."
+    type: oci:identity:compartment:id
+    required: true
+
+  region:
+    title: "Region"
+    description: "OCI region to deploy to (e.g. ap-singapore-1, us-phoenix-1)."
+    type: oci:identity:region:name
+    required: true
+
+  auth_token:
+    title: "OCI Auth Token"
+    description: "Your OCI Auth Token — used for OCIR (Docker registry) login and DevOps code repository git push. Generate one at: Profile icon → My Profile → Auth Tokens → Generate Token. Copy it immediately (shown only once)."
+    type: password
+    required: true
+    sensitive: true
+
+  devops_git_username:
+    title: "DevOps Git Username"
+    description: "Full git username for the OCI DevOps code repository. Format for federated/IDCS users (most common): NAMESPACE/oracleidentitycloudservice/your@email.com. Format for local IAM users: NAMESPACE/your_username. Find your namespace: Developer Services → Container Registry — shown at the top of the page."
+    type: string
+    required: true
+
+  ssh_public_key:
+    title: "SSH Public Key for OKE Nodes"
+    description: "Your SSH public key to allow node access if troubleshooting is needed. Paste the full content of your ~/.ssh/id_rsa.pub or equivalent."
+    type: oci:core:ssh:publickey
+    required: true
+
+  kubernetes_version:
+    title: "Kubernetes Version"
+    description: "OKE Kubernetes version. Check OCI Console → Developer Services → Kubernetes Clusters for available versions."
+    type: string
+    default: "v1.29.1"
+    required: true
+
+  node_shape:
+    title: "Worker Node Shape"
+    description: "Compute shape for OKE worker nodes."
+    type: oci:core:instanceshape:name
+    dependsOn:
+      compartmentId: compartment_ocid
+    required: true
+    default: "VM.Standard.E4.Flex"
+
+  node_ocpus:
+    title: "OCPUs per Node"
+    description: "Number of OCPUs per worker node (only applies to Flex shapes)."
+    type: integer
+    minimum: 1
+    maximum: 64
+    default: 2
+    required: true
+
+  node_memory_gb:
+    title: "Memory per Node (GB)"
+    description: "Memory in GB per worker node (only applies to Flex shapes)."
+    type: integer
+    minimum: 1
+    maximum: 1024
+    default: 16
+    required: true
+
+  node_count:
+    title: "Number of Worker Nodes"
+    description: "Number of OKE worker nodes to create."
+    type: integer
+    minimum: 1
+    maximum: 10
+    default: 2
+    required: true
+
+  app_name:
+    title: "Application Name"
+    description: "Short name used as a prefix for all resource names (lowercase letters, numbers, hyphens only). Example: fileservice"
+    type: string
+    default: "fileservice"
+    required: true
+
+  image_tag:
+    title: "Docker Image Tag"
+    description: "Tag for the Docker images built and pushed to OCIR."
+    type: string
+    default: "latest"
+    required: true
+
+outputs:
+  frontend_url:
+    title: "Frontend URL"
+    description: "Public URL of the Angular frontend hosted on OCI Object Storage."
+    type: link
+    visible: true
+
+  api_gateway_url:
+    title: "API Gateway URL"
+    description: "Base URL of the OCI API Gateway that routes to the Spring Boot backend."
+    type: link
+    visible: true
+
+  backend_health_url:
+    title: "Backend Health Check URL"
+    description: "URL to verify Spring Boot actuator health via API Gateway."
+    type: link
+    visible: true
+
+  oke_cluster_id:
+    title: "OKE Cluster OCID"
+    description: "OCID of the Kubernetes cluster."
+    visible: true
+
+  kubeconfig_command:
+    title: "kubectl Access Command"
+    description: "Run this command locally to configure kubectl for the OKE cluster."
+    visible: true
