@@ -41,21 +41,27 @@ variable "ssh_public_key" {
 }
 
 variable "instance_shape" {
-  description = "Compute shape — VM.Standard.A1.Flex is Always Free (ARM)"
+  description = "Compute shape — VM.Standard.E4.Flex (AMD x86_64). A1.Flex is ARM and frequently unavailable due to capacity."
   type        = string
-  default     = "VM.Standard.A1.Flex"
+  default     = "VM.Standard.E4.Flex"
 }
 
 variable "instance_ocpus" {
-  description = "Number of OCPUs for the instance"
+  description = "Number of OCPUs for the instance (minimum 2 for 4 Spring Boot services)"
   type        = number
-  default     = 1
+  default     = 2
 }
 
 variable "instance_memory_gb" {
-  description = "Memory in GB for the instance"
+  description = "Memory in GB for the instance (minimum 8 GB for 4 Spring Boot services)"
   type        = number
-  default     = 6
+  default     = 8
+}
+
+variable "availability_domain_index" {
+  description = "Index of the availability domain to use (0=AD-1, 1=AD-2, 2=AD-3)"
+  type        = number
+  default     = 0
 }
 
 variable "open_api_ports" {

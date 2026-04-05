@@ -700,6 +700,7 @@ docker compose up --build -d
 docker compose ps
 ```
 Hang Issues:
+on OCI:
   To confirm it's downloading (not hung):
   # In another SSH session on the VM
   watch -n2 'cat /proc/net/dev | grep -E "ens|eth" | awk "{print \$1, \$2, \$10}"'
@@ -707,8 +708,7 @@ Hang Issues:
   Or simpler:
   docker stats --no-stream
   # Should show CPU/network activity on the build container
-  
-  Step 1 — Force kill everything (since docker compose down hangs)
+  Force kill everything (since docker compose down hangs)
   From your SSH session:
   # Kill all docker build processes
   sudo kill -9 $(sudo lsof -t /var/lib/docker/buildkit/ 2>/dev/null)
@@ -717,7 +717,8 @@ Hang Issues:
   # Now docker compose down should work
   docker compose down
 
-  ● Step 3 — Reprovision with Terraform
+From Local:
+  Reprovision with Terraform
   cd deploy/terraform/option-a-vm
   # Destroy the old undersized VM
   terraform destroy
