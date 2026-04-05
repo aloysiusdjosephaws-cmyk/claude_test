@@ -1,0 +1,9 @@
+/home/aloysiusdjoseph/claudecode/claude_test/services/audit-service/src/main/java/com/example/audit/service/AuditService.java
+/home/aloysiusdjoseph/claudecode/claude_test/services/audit-service/src/main/java/com/example/audit/model/AuditEvent.java
+/home/aloysiusdjoseph/claudecode/claude_test/services/audit-service/src/main/java/com/example/audit/AuditApplication.java
+/home/aloysiusdjoseph/claudecode/claude_test/services/audit-service/src/main/java/com/example/audit/filter/JwtAuthFilter.java
+/home/aloysiusdjoseph/claudecode/claude_test/services/audit-service/src/main/java/com/example/audit/config/SecurityConfig.java
+/home/aloysiusdjoseph/claudecode/claude_test/services/audit-service/src/main/java/com/example/audit/repository/AuditEventRepository.java
+/home/aloysiusdjoseph/claudecode/claude_test/services/audit-service/src/main/java/com/example/audit/config/InternalKeyFilter.java
+/home/aloysiusdjoseph/claudecode/claude_test/services/audit-service/src/main/java/com/example/audit/dto/AuditEventDto.java
+/home/aloysiusdjoseph/claudecode/claude_test/services/audit-service/src/main/java/com/example/audit/controller/AuditController.java

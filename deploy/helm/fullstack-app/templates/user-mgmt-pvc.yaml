@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "fullstack-app.fullname" . }}-userdb
+  labels:
+    {{- include "fullstack-app.labels" . | nindent 4 }}
+    {{- include "fullstack-app.userMgmt.selectorLabels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.userManagement.hsqldb.storage.storageClassName }}
+  storageClassName: {{ .Values.userManagement.hsqldb.storage.storageClassName }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.userManagement.hsqldb.storage.size }}

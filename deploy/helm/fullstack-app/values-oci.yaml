@@ -1,57 +1,77 @@
-# OCI-specific Helm overrides for OKE deployment
-# Usage: helm install my-release ./deploy/helm/fullstack-app -f ./deploy/helm/fullstack-app/values-oci.yaml
+# OCI / OKE overrides — used alongside values.yaml
+# NOTE: Do NOT use this file for local kind clusters — kind uses storageClassName=standard.
+# Verify OKE storage class with: kubectl get storageclass (should show oci-bv)
+#
+# Usage:
+#   helm upgrade --install my-release ./deploy/helm/fullstack-app \
+#     -f ./deploy/helm/fullstack-app/values-oci.yaml \
+#     --set audit.env.JWT_SECRET=<secret> \
+#     --set audit.env.INTERNAL_API_KEY=<key> \
+#     --set userManagement.env.JWT_SECRET=<secret> \
+#     --set userManagement.env.INTERNAL_API_KEY=<key> \
+#     --set applicationManagement.env.JWT_SECRET=<secret> \
+#     --set applicationManagement.env.INTERNAL_API_KEY=<key> \
+#     --set documentManagement.env.JWT_SECRET=<secret> \
+#     --set documentManagement.env.INTERNAL_API_KEY=<key>
+#
+# Before deploying:
+#   1. Replace YOUR_REGION, YOUR_NAMESPACE, and YOUR_TAG below.
+#   2. Create the OCIR pull secret:
+#        kubectl create secret docker-registry ocir-secret \
+#          --docker-server=YOUR_REGION.ocir.io \
+#          --docker-username='YOUR_NAMESPACE/oracleidentitycloudservice/your@email.com' \
+#          --docker-password='YOUR_AUTH_TOKEN'
 
-# ─── Backend ────────────────────────────────────────────────────────────────
-backend:
-  image:
-    # OCI Container Registry (OCIR) image path
-    # Format: <region>.ocir.io/<tenancy-namespace>/<repo>:<tag>
-    repository: YOUR_REGION.ocir.io/YOUR_TENANCY_NAMESPACE/file-service
-    tag: latest
-    pullPolicy: Always
-
-  replicaCount: 2
-
-  resources:
-    requests:
-      cpu: "500m"
-      memory: "512Mi"
-    limits:
-      cpu: "1000m"
-      memory: "1Gi"
-
-  hsqldb:
-    storage:
-      size: 5Gi
-      # OKE block volume storage class
-      storageClassName: "oci-bv"
-      mountPath: /data
-
-  env:
-    SPRING_DATASOURCE_URL: "jdbc:hsqldb:file:/data/filedb;shutdown=true"
-    SPRING_JPA_HIBERNATE_DDL_AUTO: update
-    SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE: 10MB
-    SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE: 10MB
-
-# ─── Frontend ────────────────────────────────────────────────────────────────
-# Frontend is served from OCI Object Storage — no container needed in OKE.
-# Set replicaCount to 0 to skip the frontend deployment entirely.
-frontend:
-  image:
-    repository: YOUR_REGION.ocir.io/YOUR_TENANCY_NAMESPACE/frontend-client
-    tag: latest
-    pullPolicy: Always
-
-  replicaCount: 0
-
-  ingress:
-    enabled: false
-
-# ─── Image pull secret for OCIR ─────────────────────────────────────────────
-# Create the secret first:
-#   kubectl create secret docker-registry ocir-secret \
-#     --docker-server=YOUR_REGION.ocir.io \
-#     --docker-username='YOUR_TENANCY_NAMESPACE/YOUR_OCI_USERNAME' \
-#     --docker-password='YOUR_OCI_AUTH_TOKEN'
 imagePullSecrets:
   - name: ocir-secret
+
+# ─── Audit Service ────────────────────────────────────────────────────────────
+audit:
+  image:
+    repository: us-phoenix-1.ocir.io/axsagiglxgxl/audit-service
+    tag: 1.0.0
+    pullPolicy: Always
+  hsqldb:
+    storage:
+      storageClassName: oci-bv
+
+# ─── User Management Service ──────────────────────────────────────────────────
+userManagement:
+  image:
+    repository: us-phoenix-1.ocir.io/axsagiglxgxl/user-management-service
+    tag: 1.0.0
+    pullPolicy: Always
+  hsqldb:
+    storage:
+      storageClassName: oci-bv
+
+# ─── Application Management Service ──────────────────────────────────────────
+applicationManagement:
+  image:
+    repository: us-phoenix-1.ocir.io/axsagiglxgxl/application-management-service
+    tag: 1.0.0
+    pullPolicy: Always
+  hsqldb:
+    storage:
+      storageClassName: oci-bv
+
+# ─── Document Management Service ─────────────────────────────────────────────
+documentManagement:
+  image:
+    repository: us-phoenix-1.ocir.io/axsagiglxgxl/document-management-service
+    tag: 1.0.0
+    pullPolicy: Always
+  hsqldb:
+    storage:
+      storageClassName: oci-bv
+
+# ─── Frontend ─────────────────────────────────────────────────────────────────
+frontend:
+  image:
+    repository: us-phoenix-1.ocir.io/axsagiglxgxl/frontend-client
+    tag: 1.0.0
+    pullPolicy: Always
+  service:
+    type: LoadBalancer    # OCI provisions a public Load Balancer automatically
+  ingress:
+    enabled: false        # use LoadBalancer service instead of Ingress on OKE

@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: document-management-service
+  labels:
+    {{- include "fullstack-app.labels" . | nindent 4 }}
+    {{- include "fullstack-app.docMgmt.selectorLabels" . | nindent 4 }}
+spec:
+  type: {{ .Values.documentManagement.service.type }}
+  ports:
+    - port: {{ .Values.documentManagement.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "fullstack-app.docMgmt.selectorLabels" . | nindent 4 }}

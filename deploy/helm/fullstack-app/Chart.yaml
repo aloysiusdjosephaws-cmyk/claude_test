@@ -1,12 +1,13 @@
 apiVersion: v2
 name: fullstack-app
-description: Full-stack file service (Spring Boot + Angular + HSQLDB)
+description: Application Manager — Spring Boot microservices + Angular 19 + HSQLDB
 type: application
 version: 0.1.0
 appVersion: "0.0.1"
 keywords:
   - spring-boot
   - angular
-  - file-service
+  - microservices
+  - application-manager
 maintainers:
   - name: claude_test

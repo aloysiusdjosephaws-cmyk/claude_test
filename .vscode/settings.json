@@ -1,0 +1,26 @@
+{
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "java.compile.nullAnalysis.mode": "automatic",
+  "spring-boot.ls.java.home": "",
+  "editor.formatOnSave": true,
+  "[java]": {
+    "editor.defaultFormatter": "redhat.java"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/target": true,
+    "**/.classpath": true,
+    "**/.project": true,
+    "**/.settings": true,
+    "**/.factorypath": true
+  },
+  "java.project.sourcePaths": [
+    "services/audit-service/src/main/java",
+    "services/user-management-service/src/main/java",
+    "services/application-management-service/src/main/java",
+    "services/document-management-service/src/main/java"
+  ]
+}

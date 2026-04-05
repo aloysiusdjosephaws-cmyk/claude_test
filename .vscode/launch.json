@@ -1,0 +1,63 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+
+    {
+      "type": "java",
+      "name": "Debug: Audit Service",
+      "request": "launch",
+      "mainClass": "com.example.audit.AuditApplication",
+      "projectName": "audit-service",
+      "cwd": "${workspaceFolder}/services/audit-service",
+      "vmArgs": "-Dspring.profiles.active=local",
+      "presentation": { "group": "1-backends" }
+    },
+
+    {
+      "type": "java",
+      "name": "Debug: User Management Service",
+      "request": "launch",
+      "mainClass": "com.example.usermgmt.UserManagementApplication",
+      "projectName": "user-management-service",
+      "cwd": "${workspaceFolder}/services/user-management-service",
+      "vmArgs": "-Dspring.profiles.active=local",
+      "presentation": { "group": "1-backends" }
+    },
+
+    {
+      "type": "java",
+      "name": "Debug: Application Management Service",
+      "request": "launch",
+      "mainClass": "com.example.appmgmt.ApplicationManagementApplication",
+      "projectName": "application-management-service",
+      "cwd": "${workspaceFolder}/services/application-management-service",
+      "vmArgs": "-Dspring.profiles.active=local",
+      "presentation": { "group": "1-backends" }
+    },
+
+    {
+      "type": "java",
+      "name": "Debug: Document Management Service",
+      "request": "launch",
+      "mainClass": "com.example.docmgmt.DocumentManagementApplication",
+      "projectName": "document-management-service",
+      "cwd": "${workspaceFolder}/services/document-management-service",
+      "vmArgs": "-Dspring.profiles.active=local",
+      "presentation": { "group": "1-backends" }
+    }
+
+  ],
+
+  "compounds": [
+    {
+      "name": "Debug: All Backend Services",
+      "configurations": [
+        "Debug: Audit Service",
+        "Debug: User Management Service",
+        "Debug: Application Management Service",
+        "Debug: Document Management Service"
+      ],
+      "presentation": { "order": 1 }
+    }
+  ]
+}

@@ -41,6 +41,3 @@ spec:
             periodSeconds: 10
           resources:
             {{- toYaml .Values.frontend.resources | nindent 12 }}
-          env:
-            - name: BACKEND_URL
-              value: "http://{{ include "fullstack-app.fullname" . }}-backend:{{ .Values.backend.service.port }}"

@@ -1,203 +1,171 @@
-# File Service — Full-Stack Project
+# Application Manager — Full-Stack Project
 
-A Spring Boot + Angular file upload/download application backed by HSQLDB, served via Docker Compose.
+A Spring Boot microservices + Angular 19 application for managing files/documents across applications, with role-based access control, served via Docker Compose.
 
 ## Stack
 
-| Layer      | Technology                           |
-|------------|--------------------------------------|
-| Backend    | Spring Boot 3.2, Java 17, Maven      |
-| Frontend   | Angular 19, Standalone Components    |
-| Database   | HSQLDB (file-based, persisted volume)|
-| Proxy      | Nginx (serves Angular + proxies API) |
-| Container  | Docker Compose                       |
-| Kubernetes | Helm 3 chart (`deploy/helm/fullstack-app`) |
+| Layer      | Technology                                        |
+|------------|---------------------------------------------------|
+| Backend    | Spring Boot 3.2, Java 17, Maven (4 microservices) |
+| Frontend   | Angular 19, Standalone Components                 |
+| Database   | HSQLDB (file-based, separate volume per service)  |
+| Auth       | JWT (HS256, shared secret across services)        |
+| Proxy      | Nginx (serves Angular + proxies API to 4 backends)|
+| Container  | Docker Compose                                    |
+| Kubernetes | Helm 3 chart (`deploy/helm/fullstack-app`)        |
+
+## User Roles
+
+| Role | Responsibilities |
+|------|-----------------|
+| **SUPER_USER** | Add/delete/update Application Managers; assign/delete Applications to/from Application Managers. All mutations logged to audit table. |
+| **PROJECT_OFFICER** | Add/delete/update Application Users; create/list/delete Applications; assign/delete applications to/from Application Users. All mutations logged to audit table. |
+| **APPLICATION_MANAGER** | List/select Application; list/upload/update/delete/download documents; manage file groups and descriptions. File filter (Y/N): if Y, only the uploading manager can view that document. All mutations logged. |
+| **APPLICATION_USER** | Select Application; search and download documents (by AppId, KeyId, Document Name, Group). Read-only. |
+
+**Help tab** present on all screens — displays a role-specific help document stored as a file in the Document Management Service.
 
 ## Project Structure
 
 ```
 .
-├── docker-compose.yml
+├── .env.example                    # JWT_SECRET, INTERNAL_API_KEY template
+├── docker-compose.yml              # 5 services: 4 backends + frontend
 ├── deploy/
 │   └── helm/
 │       └── fullstack-app/
 │           ├── Chart.yaml
-│           ├── values.yaml             # image tags, storage, ingress host
+│           ├── values.yaml         # 4 service configs + frontend
 │           └── templates/
 │               ├── _helpers.tpl
-│               ├── backend-pvc.yaml
-│               ├── backend-deployment.yaml
-│               ├── backend-service.yaml    # ClusterIP
+│               ├── audit-*.yaml            (deployment, service, pvc)
+│               ├── user-mgmt-*.yaml        (deployment, service, pvc)
+│               ├── app-mgmt-*.yaml         (deployment, service, pvc)
+│               ├── doc-mgmt-*.yaml         (deployment, service, pvc)
 │               ├── frontend-deployment.yaml
-│               ├── frontend-service.yaml   # ClusterIP
-│               └── frontend-ingress.yaml   # host: localhost
-├── backend/
-│   ├── Dockerfile              # Multi-stage: Maven build → JRE runtime
-│   ├── pom.xml
-│   └── src/main/java/com/example/fileservice/
-│       ├── FileServiceApplication.java
-│       ├── controller/FileController.java   # POST /files/upload, GET /files/download/{id}
-│       ├── model/FileEntity.java            # @Lob byte[] storage
-│       ├── repository/FileRepository.java
-│       └── service/FileService.java
+│               ├── frontend-service.yaml
+│               └── frontend-ingress.yaml
+├── services/
+│   ├── audit-service/              # Port 8084 — stores audit events
+│   ├── user-management-service/    # Port 8081 — JWT issuance + user CRUD
+│   ├── application-management-service/  # Port 8082 — app CRUD + assignments
+│   └── document-management-service/     # Port 8083 — file upload/download/filter
 └── frontend/
-    ├── Dockerfile              # Multi-stage: Node build → Nginx serve
-    ├── nginx.conf              # Proxies /api/* → backend-service:8080
+    ├── Dockerfile
+    ├── nginx.conf                  # Proxies /api/* to 4 backends
     └── src/app/
-        ├── app.component.ts    # Standalone root component
-        └── services/file.service.ts
+        ├── core/
+        │   ├── auth.service.ts
+        │   ├── role.guard.ts
+        │   └── jwt.interceptor.ts
+        └── features/
+            ├── login/
+            ├── super-user/         # SUPER_USER screen
+            ├── project-officer/    # PROJECT_OFFICER screen
+            ├── app-manager/        # APPLICATION_MANAGER screen (matches UI spec)
+            └── app-user/           # APPLICATION_USER screen
 ```
+
+## Microservices
+
+### Audit Service (Port 8084)
+- Receives audit events from all other services via `POST /audit/events` (secured by `X-Internal-Key` header)
+- `GET /audit/events` — query events (SuperUser/ProjectOfficer via JWT)
+- HSQLDB: `/data/auditdb`
+
+### User Management Service (Port 8081)
+- `POST /auth/login` — issues JWT
+- `GET|POST|PUT|DELETE /users` — user CRUD
+- Roles: SUPER_USER, PROJECT_OFFICER, APP_MANAGER, APP_USER
+- HSQLDB: `/data/userdb`
+
+### Application Management Service (Port 8082)
+- `GET|POST|PUT|DELETE /applications` — application CRUD
+- `POST|DELETE /applications/{appId}/managers` — assign/remove managers (SuperUser/ProjectOfficer)
+- `POST|DELETE /applications/{appId}/users` — assign/remove users (ProjectOfficer)
+- Access filtering: AppManagers/AppUsers only see their assigned apps
+- HSQLDB: `/data/appdb`
+
+### Document Management Service (Port 8083)
+- `POST /documents/upload` — multipart upload (AppManager)
+- `GET /documents?appId=` — list documents (honours file_filter)
+- `GET /documents/{id}/download` — download file bytes
+- `PUT /documents/{id}` — update description/group
+- `DELETE /documents/{id}` — soft delete
+- `GET /documents/search` — AppUser search by appId/keyId/docName/group
+- `GET|POST /groups` — group management
+- `GET|PUT /help/{screenName}` — help documents per role screen
+- **File Filter Logic**: if `fileFilter=Y`, only the uploading AppManager can view/download that document
+- HSQLDB: `/data/docdb`
+
+## Nginx Routing (`frontend/nginx.conf`)
+
+| Path prefix | Proxied to |
+|-------------|-----------|
+| `/api/auth/` | user-management-service:8081 |
+| `/api/users/` | user-management-service:8081 |
+| `/api/applications/` | application-management-service:8082 |
+| `/api/documents/` | document-management-service:8083 |
+| `/api/groups/` | document-management-service:8083 |
+| `/api/help/` | document-management-service:8083 |
+| `/api/audit/` | audit-service:8084 |
 
 ## Build & Run
 
 ### Prerequisites
 - Docker 24+ and Docker Compose v2
 
-### Start everything
+### Setup
+```bash
+cp .env.example .env
+# Edit .env: set JWT_SECRET and INTERNAL_API_KEY
+```
 
+### Start everything
 ```bash
 docker-compose up --build -d
 ```
 
-This will:
-1. Build the Spring Boot JAR (Maven inside Docker)
-2. Build the Angular app (npm inside Docker) and bundle into Nginx
-3. Start both containers; frontend waits for backend health check
-
-### Verify backend health
-
-```bash
-curl http://localhost:8080/actuator/health
-# Expected: {"status":"UP",...}
-```
+Startup order: audit-service → user-management-service → application-management-service → document-management-service → frontend-client
 
 ### Access the UI
-
-Open [http://localhost:4200](http://localhost:4200) in your browser.
+Open [http://localhost:4200](http://localhost:4200) — redirects to `/login`.
 
 ### Stop
-
 ```bash
 docker-compose down
-```
-
-To also remove the persisted database volume:
-
-```bash
+# To also remove all database volumes:
 docker-compose down -v
 ```
 
-## API Endpoints
+## Angular Screens
 
-| Method | Path                      | Description              |
-|--------|---------------------------|--------------------------|
-| POST   | `/files/upload`           | Upload a file (multipart)|
-| GET    | `/files/download/{id}`    | Download file by ID      |
-| GET    | `/files`                  | List all file metadata   |
-| GET    | `/actuator/health`        | Health check             |
+| Route | Role | Key Features |
+|-------|------|-------------|
+| `/login` | Public | Username/password → JWT → role-based redirect |
+| `/super-user` | SUPER_USER | Manage Application Managers + App Assignments |
+| `/project-officer` | PROJECT_OFFICER | Manage Applications + Users + Assignments |
+| `/app-manager` | APP_MANAGER | Two-panel: left (upload/edit/groups/app list) + right (document table with filter+pagination) |
+| `/app-user` | APP_USER | Select app → search documents → download |
 
-### Upload example
-
-```bash
-curl -X POST http://localhost:8080/files/upload \
-  -F "file=@/path/to/yourfile.pdf"
-```
-
-### Download example
-
-```bash
-curl -O -J http://localhost:8080/files/download/1
-```
-
-## Configuration
-
-Key settings in `backend/src/main/resources/application.properties`:
-
-| Property                                  | Value              |
-|-------------------------------------------|--------------------|
-| `spring.servlet.multipart.max-file-size`  | 10MB               |
-| `spring.datasource.url`                   | `jdbc:hsqldb:file:/data/filedb` |
-| `server.port`                             | 8080               |
-
-CORS is enabled for `http://localhost:4200` via `@CrossOrigin` on `FileController`.
-
-The Nginx proxy rewrites `/api/*` → `http://backend-service:8080/*`, so the Angular app calls `/api/files/...` and never needs to know the backend host directly.
-
----
-
-## Kubernetes / Helm
-
-### Prerequisites
-- Helm 3 installed (`helm version`)
-- A running Kubernetes cluster (Minikube, kind, Docker Desktop K8s, etc.)
-- Images built and available in the cluster (see below)
-
-### Lint the chart
+## Helm Deployment
 
 ```bash
 helm lint ./deploy/helm/fullstack-app
-# Expected: 1 chart(s) linted, 0 chart(s) failed
-```
-
-### Preview rendered manifests
-
-```bash
 helm template my-release ./deploy/helm/fullstack-app
-```
-
-Override values inline:
-
-```bash
-helm template my-release ./deploy/helm/fullstack-app \
-  --set backend.image.tag=1.0.0 \
-  --set frontend.image.tag=1.0.0 \
-  --set backend.hsqldb.storage.size=2Gi \
-  --set frontend.ingress.host=myapp.local
-```
-
-### Deploy to a cluster
-
-```bash
-# Build and load images into your cluster (example: kind)
-docker build -t backend-service:latest ./backend
-docker build -t frontend-client:latest ./frontend
-kind load docker-image backend-service:latest frontend-client:latest
-
-# Install the release
-helm install my-release ./deploy/helm/fullstack-app
-
-# Upgrade an existing release
-helm upgrade my-release ./deploy/helm/fullstack-app --set backend.image.tag=1.1.0
-
-# Uninstall
-helm uninstall my-release
-```
-
-### Values reference
-
-| Key | Default | Description |
-|-----|---------|-------------|
-| `backend.image.repository` | `backend-service` | Backend image name |
-| `backend.image.tag` | `latest` | Backend image tag |
-| `backend.hsqldb.storage.size` | `1Gi` | PVC size for HSQLDB |
-| `backend.hsqldb.storage.storageClassName` | `""` | StorageClass (empty = cluster default) |
-| `backend.hsqldb.storage.mountPath` | `/data` | Mount path inside container |
-| `frontend.image.repository` | `frontend-client` | Frontend image name |
-| `frontend.image.tag` | `latest` | Frontend image tag |
-| `frontend.ingress.enabled` | `true` | Enable Ingress resource |
-| `frontend.ingress.host` | `localhost` | Ingress hostname |
-| `frontend.ingress.className` | `""` | IngressClass (set to `nginx` for ingress-nginx) |
-
-### Ingress for local testing
-
-The Ingress is pre-configured with `host: localhost`. With ingress-nginx:
-
-```bash
-# Install ingress-nginx (kind example)
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
-
 helm install my-release ./deploy/helm/fullstack-app \
-  --set frontend.ingress.className=nginx
-
-# Then open http://localhost in your browser
+  --set audit.env.JWT_SECRET=your-secret \
+  --set userManagement.env.JWT_SECRET=your-secret \
+  --set applicationManagement.env.JWT_SECRET=your-secret \
+  --set documentManagement.env.JWT_SECRET=your-secret
 ```
+
+## Environment Variables
+
+| Variable | Used by | Description |
+|----------|---------|-------------|
+| `JWT_SECRET` | All 4 services | Shared HS256 signing secret |
+| `INTERNAL_API_KEY` | audit-service + callers | Service-to-service auth for audit endpoint |
+| `AUDIT_SERVICE_URL` | user-mgmt, app-mgmt, doc-mgmt | URL of audit-service |
+| `USER_SERVICE_URL` | app-mgmt | URL of user-management-service |
+| `APP_SERVICE_URL` | doc-mgmt | URL of application-management-service |

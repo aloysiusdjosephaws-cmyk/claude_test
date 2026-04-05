@@ -1,8 +1,44 @@
 {
-  "/api": {
-    "target": "http://localhost:8080",
+  "/api/auth": {
+    "target": "http://localhost:8081",
     "secure": false,
-    "pathRewrite": { "^/api": "" },
+    "pathRewrite": { "^/api/auth": "/auth" },
+    "logLevel": "info"
+  },
+  "/api/users": {
+    "target": "http://localhost:8081",
+    "secure": false,
+    "pathRewrite": { "^/api/users": "/users" },
+    "logLevel": "info"
+  },
+  "/api/applications": {
+    "target": "http://localhost:8082",
+    "secure": false,
+    "pathRewrite": { "^/api/applications": "/applications" },
+    "logLevel": "info"
+  },
+  "/api/documents": {
+    "target": "http://localhost:8083",
+    "secure": false,
+    "pathRewrite": { "^/api/documents": "/documents" },
+    "logLevel": "info"
+  },
+  "/api/groups": {
+    "target": "http://localhost:8083",
+    "secure": false,
+    "pathRewrite": { "^/api/groups": "/groups" },
+    "logLevel": "info"
+  },
+  "/api/help": {
+    "target": "http://localhost:8083",
+    "secure": false,
+    "pathRewrite": { "^/api/help": "/help" },
+    "logLevel": "info"
+  },
+  "/api/audit": {
+    "target": "http://localhost:8084",
+    "secure": false,
+    "pathRewrite": { "^/api/audit": "/audit" },
     "logLevel": "info"
   }
 }

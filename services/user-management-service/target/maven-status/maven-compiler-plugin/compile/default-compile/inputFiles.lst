@@ -1,0 +1,17 @@
+/home/aloysiusdjoseph/claudecode/claude_test/services/user-management-service/src/main/java/com/example/usermgmt/dto/LoginResponse.java
+/home/aloysiusdjoseph/claudecode/claude_test/services/user-management-service/src/main/java/com/example/usermgmt/config/SecurityConfig.java
+/home/aloysiusdjoseph/claudecode/claude_test/services/user-management-service/src/main/java/com/example/usermgmt/dto/LoginRequest.java
+/home/aloysiusdjoseph/claudecode/claude_test/services/user-management-service/src/main/java/com/example/usermgmt/controller/UserController.java
+/home/aloysiusdjoseph/claudecode/claude_test/services/user-management-service/src/main/java/com/example/usermgmt/config/AppConfig.java
+/home/aloysiusdjoseph/claudecode/claude_test/services/user-management-service/src/main/java/com/example/usermgmt/service/UserService.java
+/home/aloysiusdjoseph/claudecode/claude_test/services/user-management-service/src/main/java/com/example/usermgmt/service/JwtService.java
+/home/aloysiusdjoseph/claudecode/claude_test/services/user-management-service/src/main/java/com/example/usermgmt/filter/JwtAuthFilter.java
+/home/aloysiusdjoseph/claudecode/claude_test/services/user-management-service/src/main/java/com/example/usermgmt/dto/AuditEventDto.java
+/home/aloysiusdjoseph/claudecode/claude_test/services/user-management-service/src/main/java/com/example/usermgmt/client/AuditClient.java
+/home/aloysiusdjoseph/claudecode/claude_test/services/user-management-service/src/main/java/com/example/usermgmt/model/User.java
+/home/aloysiusdjoseph/claudecode/claude_test/services/user-management-service/src/main/java/com/example/usermgmt/controller/AuthController.java
+/home/aloysiusdjoseph/claudecode/claude_test/services/user-management-service/src/main/java/com/example/usermgmt/dto/CreateUserRequest.java
+/home/aloysiusdjoseph/claudecode/claude_test/services/user-management-service/src/main/java/com/example/usermgmt/service/AuthService.java
+/home/aloysiusdjoseph/claudecode/claude_test/services/user-management-service/src/main/java/com/example/usermgmt/repository/UserRepository.java
+/home/aloysiusdjoseph/claudecode/claude_test/services/user-management-service/src/main/java/com/example/usermgmt/UserManagementApplication.java
+/home/aloysiusdjoseph/claudecode/claude_test/services/user-management-service/src/main/java/com/example/usermgmt/dto/UpdateUserRequest.java

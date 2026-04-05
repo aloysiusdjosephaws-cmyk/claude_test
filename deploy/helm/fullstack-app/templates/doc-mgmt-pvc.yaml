@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "fullstack-app.fullname" . }}-docdb
+  labels:
+    {{- include "fullstack-app.labels" . | nindent 4 }}
+    {{- include "fullstack-app.docMgmt.selectorLabels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.documentManagement.hsqldb.storage.storageClassName }}
+  storageClassName: {{ .Values.documentManagement.hsqldb.storage.storageClassName }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.documentManagement.hsqldb.storage.size }}

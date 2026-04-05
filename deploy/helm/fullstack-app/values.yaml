@@ -1,7 +1,7 @@
-# ─── Backend ────────────────────────────────────────────────────────────────
-backend:
+# ─── Audit Service ───────────────────────────────────────────────────────────
+audit:
   image:
-    repository: backend-service
+    repository: audit-service
     tag: latest
     pullPolicy: IfNotPresent
 
@@ -9,28 +9,129 @@ backend:
 
   service:
     type: ClusterIP
-    port: 8080
+    port: 8084
 
   resources:
     requests:
-      cpu: "250m"
+      cpu: "150m"
+      memory: "256Mi"
+    limits:
+      cpu: "300m"
+      memory: "512Mi"
+
+  hsqldb:
+    storage:
+      size: 1Gi
+      storageClassName: ""
+      mountPath: /data
+
+  env:
+    SPRING_DATASOURCE_URL: "jdbc:hsqldb:file:/data/auditdb;shutdown=true"
+    JWT_SECRET: "change-me-in-production"
+    INTERNAL_API_KEY: "internal-secret-key"
+
+# ─── User Management Service ─────────────────────────────────────────────────
+userManagement:
+  image:
+    repository: user-management-service
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  service:
+    type: ClusterIP
+    port: 8081
+
+  resources:
+    requests:
+      cpu: "200m"
       memory: "256Mi"
     limits:
       cpu: "500m"
       memory: "512Mi"
 
-  # HSQLDB file-based storage
   hsqldb:
     storage:
       size: 1Gi
-      storageClassName: ""   # leave empty to use cluster default
+      storageClassName: ""
       mountPath: /data
 
   env:
-    SPRING_DATASOURCE_URL: "jdbc:hsqldb:file:/data/filedb;shutdown=true"
-    SPRING_JPA_HIBERNATE_DDL_AUTO: update
-    SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE: 10MB
-    SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE: 10MB
+    SPRING_DATASOURCE_URL: "jdbc:hsqldb:file:/data/userdb;shutdown=true"
+    JWT_SECRET: "change-me-in-production"
+    INTERNAL_API_KEY: "internal-secret-key"
+    AUDIT_SERVICE_URL: "http://audit-service:8084"
+
+# ─── Application Management Service ──────────────────────────────────────────
+applicationManagement:
+  image:
+    repository: application-management-service
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  service:
+    type: ClusterIP
+    port: 8082
+
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+  hsqldb:
+    storage:
+      size: 1Gi
+      storageClassName: ""
+      mountPath: /data
+
+  env:
+    SPRING_DATASOURCE_URL: "jdbc:hsqldb:file:/data/appdb;shutdown=true"
+    JWT_SECRET: "change-me-in-production"
+    INTERNAL_API_KEY: "internal-secret-key"
+    AUDIT_SERVICE_URL: "http://audit-service:8084"
+    USER_SERVICE_URL: "http://user-management-service:8081"
+
+# ─── Document Management Service ─────────────────────────────────────────────
+documentManagement:
+  image:
+    repository: document-management-service
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  replicaCount: 1
+
+  service:
+    type: ClusterIP
+    port: 8083
+
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "500m"
+      memory: "1Gi"
+
+  hsqldb:
+    storage:
+      size: 5Gi          # larger: stores file BLOBs
+      storageClassName: ""
+      mountPath: /data
+
+  env:
+    SPRING_DATASOURCE_URL: "jdbc:hsqldb:file:/data/docdb;shutdown=true"
+    SPRING_SERVLET_MULTIPART_MAX_FILE_SIZE: "50MB"
+    SPRING_SERVLET_MULTIPART_MAX_REQUEST_SIZE: "50MB"
+    JWT_SECRET: "change-me-in-production"
+    INTERNAL_API_KEY: "internal-secret-key"
+    AUDIT_SERVICE_URL: "http://audit-service:8084"
+    APP_SERVICE_URL: "http://application-management-service:8082"
 
 # ─── Frontend ────────────────────────────────────────────────────────────────
 frontend:

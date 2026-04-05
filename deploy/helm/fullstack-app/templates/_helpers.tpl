@@ -37,10 +37,34 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
-Backend selector labels
+Audit Service selector labels
 */}}
-{{- define "fullstack-app.backend.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "fullstack-app.name" . }}-backend
+{{- define "fullstack-app.audit.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "fullstack-app.name" . }}-audit
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+
+{{/*
+User Management selector labels
+*/}}
+{{- define "fullstack-app.userMgmt.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "fullstack-app.name" . }}-user-mgmt
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+
+{{/*
+Application Management selector labels
+*/}}
+{{- define "fullstack-app.appMgmt.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "fullstack-app.name" . }}-app-mgmt
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+
+{{/*
+Document Management selector labels
+*/}}
+{{- define "fullstack-app.docMgmt.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "fullstack-app.name" . }}-doc-mgmt
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
