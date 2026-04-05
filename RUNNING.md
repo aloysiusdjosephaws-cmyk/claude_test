@@ -699,16 +699,41 @@ nano .env   # set JWT_SECRET and INTERNAL_API_KEY
 docker compose up --build -d
 docker compose ps
 ```
-
+Hang Issues:
   To confirm it's downloading (not hung):
   # In another SSH session on the VM
   watch -n2 'cat /proc/net/dev | grep -E "ens|eth" | awk "{print \$1, \$2, \$10}"'
   # You should see RX bytes incrementing
-
   Or simpler:
   docker stats --no-stream
   # Should show CPU/network activity on the build container
   
+  Step 1 — Force kill everything (since docker compose down hangs)
+  From your SSH session:
+  # Kill all docker build processes
+  sudo kill -9 $(sudo lsof -t /var/lib/docker/buildkit/ 2>/dev/null)
+  # If that doesn't work, restart Docker entirely
+  sudo systemctl restart docker
+  # Now docker compose down should work
+  docker compose down
+
+  ● Step 3 — Reprovision with Terraform
+  cd deploy/terraform/option-a-vm
+  # Destroy the old undersized VM
+  terraform destroy
+  # Provision a new correctly-sized one
+  terraform apply tfplan
+  # or re-plan first:
+  terraform plan -out=tfplan
+  terraform apply tfplan
+  Then SSH into the new VM and start fresh:
+  ssh ubuntu@<NEW-PUBLIC-IP>
+  git clone <your-repo-url> app-manager
+  cd app-manager
+  cp .env.example .env
+  nano .env   # set JWT_SECRET and INTERNAL_API_KEY and COMPOSE_PARALLEL_LIMIT=1
+  docker compose up --build -d
+
 #### Step 4 — Access the UI
 
 Open **http://\<PUBLIC-IP\>:4200** in your browser.
