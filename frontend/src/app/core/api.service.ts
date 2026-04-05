@@ -9,16 +9,16 @@ export class ApiService {
   // Users
   getUsers(role?: string): Observable<any[]> {
     const params = role ? `?role=${role}` : '';
-    return this.http.get<any[]>(`/api/users/${params}`);
+    return this.http.get<any[]>(`/api/users${params}`);
   }
-  createUser(data: any): Observable<any> { return this.http.post('/api/users/', data); }
+  createUser(data: any): Observable<any> { return this.http.post('/api/users', data); }
   updateUser(userId: string, data: any): Observable<any> { return this.http.put(`/api/users/${userId}`, data); }
   deleteUser(userId: string): Observable<any> { return this.http.delete(`/api/users/${userId}`); }
   getMe(): Observable<any> { return this.http.get('/api/users/me'); }
 
   // Applications
-  getApplications(): Observable<any[]> { return this.http.get<any[]>('/api/applications/'); }
-  createApplication(data: any): Observable<any> { return this.http.post('/api/applications/', data); }
+  getApplications(): Observable<any[]> { return this.http.get<any[]>('/api/applications'); }
+  createApplication(data: any): Observable<any> { return this.http.post('/api/applications', data); }
   updateApplication(appId: string, data: any): Observable<any> { return this.http.put(`/api/applications/${appId}`, data); }
   deleteApplication(appId: string): Observable<any> { return this.http.delete(`/api/applications/${appId}`); }
   getManagers(appId: string): Observable<any[]> { return this.http.get<any[]>(`/api/applications/${appId}/managers`); }
@@ -56,7 +56,7 @@ export class ApiService {
 
   // Groups
   getGroups(appId: string): Observable<any[]> { return this.http.get<any[]>(`/api/groups?appId=${appId}`); }
-  createGroup(appId: string, groupName: string): Observable<any> { return this.http.post('/api/groups/', { appId, groupName }); }
+  createGroup(appId: string, groupName: string): Observable<any> { return this.http.post('/api/groups', { appId, groupName }); }
   updateGroup(id: number, groupName: string): Observable<any> { return this.http.put(`/api/groups/${id}`, { groupName }); }
 
   // Help
