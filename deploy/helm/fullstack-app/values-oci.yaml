@@ -28,7 +28,7 @@ imagePullSecrets:
 # ─── Audit Service ────────────────────────────────────────────────────────────
 audit:
   image:
-    repository: us-phoenix-1.ocir.io/axsagiglxgxl/audit-service
+    repository: YOUR_REGION.ocir.io/YOUR_NAMESPACE/audit-service
     tag: 1.0.0
     pullPolicy: Always
   hsqldb:
@@ -38,7 +38,7 @@ audit:
 # ─── User Management Service ──────────────────────────────────────────────────
 userManagement:
   image:
-    repository: us-phoenix-1.ocir.io/axsagiglxgxl/user-management-service
+    repository: YOUR_REGION.ocir.io/YOUR_NAMESPACE/user-management-service
     tag: 1.0.0
     pullPolicy: Always
   hsqldb:
@@ -48,7 +48,7 @@ userManagement:
 # ─── Application Management Service ──────────────────────────────────────────
 applicationManagement:
   image:
-    repository: us-phoenix-1.ocir.io/axsagiglxgxl/application-management-service
+    repository: YOUR_REGION.ocir.io/YOUR_NAMESPACE/application-management-service
     tag: 1.0.0
     pullPolicy: Always
   hsqldb:
@@ -58,7 +58,7 @@ applicationManagement:
 # ─── Document Management Service ─────────────────────────────────────────────
 documentManagement:
   image:
-    repository: us-phoenix-1.ocir.io/axsagiglxgxl/document-management-service
+    repository: YOUR_REGION.ocir.io/YOUR_NAMESPACE/document-management-service
     tag: 1.0.0
     pullPolicy: Always
   hsqldb:
@@ -68,7 +68,7 @@ documentManagement:
 # ─── Frontend ─────────────────────────────────────────────────────────────────
 frontend:
   image:
-    repository: us-phoenix-1.ocir.io/axsagiglxgxl/frontend-client
+    repository: YOUR_REGION.ocir.io/YOUR_NAMESPACE/frontend-client
     tag: 1.0.0
     pullPolicy: Always
   service:
