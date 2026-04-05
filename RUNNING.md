@@ -266,6 +266,8 @@ cp .env.example .env
 ```
 
 Open `.env` in any text editor and set your own values:
+  echo "JWT_SECRET=$(openssl rand -hex 32)"
+  echo "INTERNAL_API_KEY=$(openssl rand -hex 32)"
 ```
 JWT_SECRET=replace-with-a-long-random-string-minimum-32-characters
 INTERNAL_API_KEY=replace-with-another-secret-value
