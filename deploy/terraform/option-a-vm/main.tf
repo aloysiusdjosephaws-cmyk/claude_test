@@ -80,10 +80,10 @@ resource "oci_core_security_list" "app" {
     }
   }
 
-  # Angular UI
+  # Angular UI — only reachable from within the VCN (API Gateway uses private IP)
   ingress_security_rules {
     protocol = "6"
-    source   = "0.0.0.0/0"
+    source   = "10.0.0.0/16"
     tcp_options {
       min = 4200
       max = 4200
@@ -161,4 +161,42 @@ locals {
     systemctl enable docker
     systemctl start docker
   EOT
+}
+
+# ─── OCI API Gateway ──────────────────────────────────────────────────────────
+
+resource "oci_apigateway_gateway" "main" {
+  compartment_id = var.compartment_ocid
+  endpoint_type  = "PUBLIC"
+  subnet_id      = oci_core_subnet.public.id
+  display_name   = "app-manager-gateway"
+}
+
+resource "oci_apigateway_deployment" "main" {
+  compartment_id = var.compartment_ocid
+  gateway_id     = oci_apigateway_gateway.main.id
+  display_name   = "app-manager-deployment"
+  path_prefix    = "/"
+
+  specification {
+    routes {
+      path    = "/{path*}"
+      methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"]
+      backend {
+        type = "HTTP_BACKEND"
+        url  = "http://${oci_core_instance.app_vm.private_ip}:4200/{path}"
+      }
+    }
+  }
+}
+
+# ─── Outputs ──────────────────────────────────────────────────────────────────
+
+output "vm_public_ip" {
+  value = oci_core_instance.app_vm.public_ip
+}
+
+output "api_gateway_url" {
+  description = "Public HTTPS endpoint for the API Gateway"
+  value       = "https://${oci_apigateway_gateway.main.hostname}"
 }
