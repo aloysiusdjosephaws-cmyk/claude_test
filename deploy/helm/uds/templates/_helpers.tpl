@@ -1,14 +1,14 @@
 {{/*
 Expand the name of the chart.
 */}}
-{{- define "fullstack-app.name" -}}
+{{- define "uds.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Create a default fully qualified app name.
 */}}
-{{- define "fullstack-app.fullname" -}}
+{{- define "uds.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
@@ -24,54 +24,54 @@ Create a default fully qualified app name.
 {{/*
 Chart label
 */}}
-{{- define "fullstack-app.chart" -}}
+{{- define "uds.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
 Common labels
 */}}
-{{- define "fullstack-app.labels" -}}
-helm.sh/chart: {{ include "fullstack-app.chart" . }}
+{{- define "uds.labels" -}}
+helm.sh/chart: {{ include "uds.chart" . }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
 {{/*
 Audit Service selector labels
 */}}
-{{- define "fullstack-app.audit.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "fullstack-app.name" . }}-audit
+{{- define "uds.audit.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "uds.name" . }}-audit
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 User Management selector labels
 */}}
-{{- define "fullstack-app.userMgmt.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "fullstack-app.name" . }}-user-mgmt
+{{- define "uds.userMgmt.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "uds.name" . }}-user-mgmt
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Application Management selector labels
 */}}
-{{- define "fullstack-app.appMgmt.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "fullstack-app.name" . }}-app-mgmt
+{{- define "uds.appMgmt.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "uds.name" . }}-app-mgmt
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Document Management selector labels
 */}}
-{{- define "fullstack-app.docMgmt.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "fullstack-app.name" . }}-doc-mgmt
+{{- define "uds.docMgmt.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "uds.name" . }}-doc-mgmt
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
 {{/*
 Frontend selector labels
 */}}
-{{- define "fullstack-app.frontend.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "fullstack-app.name" . }}-frontend
+{{- define "uds.frontend.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "uds.name" . }}-frontend
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}

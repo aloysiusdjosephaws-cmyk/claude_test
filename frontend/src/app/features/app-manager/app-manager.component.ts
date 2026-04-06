@@ -115,7 +115,7 @@ import { ApiService } from '../../core/api.service';
       <div class="main-panel">
         <!-- Header -->
         <div class="header">
-          <span class="app-name">{{ selectedApp?.appName || 'Application Manager' }} ⚙</span>
+          <span class="app-name">{{ selectedApp?.appName || 'UDS' }} ⚙</span>
           <div class="tabs">
             <button class="tab-btn" [class.active]="mainTab==='files'" (click)="mainTab='files'">Files</button>
             <button class="tab-btn" [class.active]="mainTab==='help'" (click)="mainTab='help'">Help</button>

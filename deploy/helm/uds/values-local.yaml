@@ -1,0 +1,74 @@
+# Local minikube overrides — used alongside values.yaml
+# See RUNNING.md for the full local deployment walkthrough.
+#
+# Quick reference:
+#   minikube start --cpus=4 --memory=8192
+#   minikube addons enable ingress
+#   eval $(minikube docker-env)
+#   docker build --build-arg NG_CONFIG=development -t frontend-client:local ./frontend
+#   docker build -t user-management-service:local        ./services/user-management-service
+#   docker build -t application-management-service:local ./services/application-management-service
+#   docker build -t document-management-service:local    ./services/document-management-service
+#   docker build -t audit-service:local                  ./services/audit-service
+#
+#   JWT_SECRET=$(openssl rand -hex 32)
+#   INTERNAL_API_KEY=$(openssl rand -hex 16)
+#   helm upgrade --install uds ./deploy/helm/uds \
+#     -f ./deploy/helm/uds/values-local.yaml \
+#     --set audit.env.JWT_SECRET=$JWT_SECRET \
+#     --set audit.env.INTERNAL_API_KEY=$INTERNAL_API_KEY \
+#     --set userManagement.env.JWT_SECRET=$JWT_SECRET \
+#     --set userManagement.env.INTERNAL_API_KEY=$INTERNAL_API_KEY \
+#     --set applicationManagement.env.JWT_SECRET=$JWT_SECRET \
+#     --set applicationManagement.env.INTERNAL_API_KEY=$INTERNAL_API_KEY \
+#     --set documentManagement.env.JWT_SECRET=$JWT_SECRET \
+#     --set documentManagement.env.INTERNAL_API_KEY=$INTERNAL_API_KEY
+#
+# Access: http://localhost  (minikube tunnel in a separate terminal)
+
+# ─── Images — use locally built tags, never pull from registry ───────────────
+audit:
+  image:
+    tag: local
+    pullPolicy: Never
+  hsqldb:
+    storage:
+      storageClassName: standard
+
+userManagement:
+  image:
+    tag: local
+    pullPolicy: Never
+  hsqldb:
+    storage:
+      storageClassName: standard
+
+applicationManagement:
+  image:
+    tag: local
+    pullPolicy: Never
+  hsqldb:
+    storage:
+      storageClassName: standard
+
+documentManagement:
+  image:
+    tag: local
+    pullPolicy: Never
+  hsqldb:
+    storage:
+      storageClassName: standard
+
+# ─── Frontend — nginx ingress on localhost ────────────────────────────────────
+frontend:
+  image:
+    tag: local
+    pullPolicy: Never
+  ingress:
+    enabled: true
+    className: nginx
+    host: ""          # empty = match any host, access via http://localhost
+    path: /
+    pathType: Prefix
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "false"

@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 export interface AuthUser {
   userId: string;
@@ -17,7 +18,7 @@ export class AuthService {
   constructor(private http: HttpClient, private router: Router) {}
 
   login(username: string, password: string): Observable<any> {
-    return this.http.post<any>('/api/auth/login', { username, password }).pipe(
+    return this.http.post<any>(`${environment.apiUrl}/auth/login`, { username, password }).pipe(
       tap(res => {
         if (res.token) {
           localStorage.setItem(this.TOKEN_KEY, res.token);

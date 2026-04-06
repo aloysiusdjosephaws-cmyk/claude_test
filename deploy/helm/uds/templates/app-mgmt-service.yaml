@@ -3,8 +3,8 @@ kind: Service
 metadata:
   name: application-management-service
   labels:
-    {{- include "fullstack-app.labels" . | nindent 4 }}
-    {{- include "fullstack-app.appMgmt.selectorLabels" . | nindent 4 }}
+    {{- include "uds.labels" . | nindent 4 }}
+    {{- include "uds.appMgmt.selectorLabels" . | nindent 4 }}
 spec:
   type: {{ .Values.applicationManagement.service.type }}
   ports:
@@ -13,4 +13,4 @@ spec:
       protocol: TCP
       name: http
   selector:
-    {{- include "fullstack-app.appMgmt.selectorLabels" . | nindent 4 }}
+    {{- include "uds.appMgmt.selectorLabels" . | nindent 4 }}

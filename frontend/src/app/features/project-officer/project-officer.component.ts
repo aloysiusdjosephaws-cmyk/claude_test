@@ -12,7 +12,7 @@ import { ApiService } from '../../core/api.service';
   template: `
     <div class="page">
       <div class="header">
-        <span class="app-name">Application Manager ⚙</span>
+        <span class="app-name">UDS ⚙</span>
         <div class="tabs">
           <button class="tab-btn" [class.active]="tab==='apps'" (click)="tab='apps'">Applications</button>
           <button class="tab-btn" [class.active]="tab==='users'" (click)="tab='users';loadUsers()">Users</button>

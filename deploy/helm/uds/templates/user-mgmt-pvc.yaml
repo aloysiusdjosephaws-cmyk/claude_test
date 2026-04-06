@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "fullstack-app.fullname" . }}-userdb
+  name: {{ include "uds.fullname" . }}-userdb
   labels:
-    {{- include "fullstack-app.labels" . | nindent 4 }}
-    {{- include "fullstack-app.userMgmt.selectorLabels" . | nindent 4 }}
+    {{- include "uds.labels" . | nindent 4 }}
+    {{- include "uds.userMgmt.selectorLabels" . | nindent 4 }}
 spec:
   accessModes:
     - ReadWriteOnce

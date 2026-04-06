@@ -1,26 +1,13 @@
 # OCI / OKE overrides — used alongside values.yaml
-# NOTE: Do NOT use this file for local kind clusters — kind uses storageClassName=standard.
-# Verify OKE storage class with: kubectl get storageclass (should show oci-bv)
-#
-# Usage:
-#   helm upgrade --install my-release ./deploy/helm/fullstack-app \
-#     -f ./deploy/helm/fullstack-app/values-oci.yaml \
-#     --set audit.env.JWT_SECRET=<secret> \
-#     --set audit.env.INTERNAL_API_KEY=<key> \
-#     --set userManagement.env.JWT_SECRET=<secret> \
-#     --set userManagement.env.INTERNAL_API_KEY=<key> \
-#     --set applicationManagement.env.JWT_SECRET=<secret> \
-#     --set applicationManagement.env.INTERNAL_API_KEY=<key> \
-#     --set documentManagement.env.JWT_SECRET=<secret> \
-#     --set documentManagement.env.INTERNAL_API_KEY=<key>
+# See RUNNING.md for the full OCI deployment walkthrough.
 #
 # Before deploying:
 #   1. Replace YOUR_REGION, YOUR_NAMESPACE, and YOUR_TAG below.
-#   2. Create the OCIR pull secret:
-#        kubectl create secret docker-registry ocir-secret \
-#          --docker-server=YOUR_REGION.ocir.io \
-#          --docker-username='YOUR_NAMESPACE/oracleidentitycloudservice/your@email.com' \
-#          --docker-password='YOUR_AUTH_TOKEN'
+#   2. Build images with NG_CONFIG=production and push to OCIR.
+#   3. Create the OCIR pull secret and TLS secret (see RUNNING.md).
+#
+# Verify OKE storage class before deploying:
+#   kubectl get storageclass   # should show oci-bv
 
 imagePullSecrets:
   - name: ocir-secret
@@ -28,7 +15,7 @@ imagePullSecrets:
 # ─── Audit Service ────────────────────────────────────────────────────────────
 audit:
   image:
-    repository: YOUR_REGION.ocir.io/YOUR_NAMESPACE/audit-service
+    repository: us-phoenix-1.ocir.io/axsagiglxgxl/audit-service
     tag: 1.0.0
     pullPolicy: Always
   hsqldb:
@@ -38,7 +25,7 @@ audit:
 # ─── User Management Service ──────────────────────────────────────────────────
 userManagement:
   image:
-    repository: YOUR_REGION.ocir.io/YOUR_NAMESPACE/user-management-service
+    repository: us-phoenix-1.ocir.io/axsagiglxgxl/user-management-service
     tag: 1.0.0
     pullPolicy: Always
   hsqldb:
@@ -48,7 +35,7 @@ userManagement:
 # ─── Application Management Service ──────────────────────────────────────────
 applicationManagement:
   image:
-    repository: YOUR_REGION.ocir.io/YOUR_NAMESPACE/application-management-service
+    repository: us-phoenix-1.ocir.io/axsagiglxgxl/application-management-service
     tag: 1.0.0
     pullPolicy: Always
   hsqldb:
@@ -58,7 +45,7 @@ applicationManagement:
 # ─── Document Management Service ─────────────────────────────────────────────
 documentManagement:
   image:
-    repository: YOUR_REGION.ocir.io/YOUR_NAMESPACE/document-management-service
+    repository: us-phoenix-1.ocir.io/axsagiglxgxl/document-management-service
     tag: 1.0.0
     pullPolicy: Always
   hsqldb:
@@ -68,10 +55,16 @@ documentManagement:
 # ─── Frontend ─────────────────────────────────────────────────────────────────
 frontend:
   image:
-    repository: YOUR_REGION.ocir.io/YOUR_NAMESPACE/frontend-client
-    tag: 1.0.0
+    repository: us-phoenix-1.ocir.io/axsagiglxgxl/frontend-client
+    tag: 1.0.2
     pullPolicy: Always
-  service:
-    type: LoadBalancer    # OCI provisions a public Load Balancer automatically
   ingress:
-    enabled: false        # use LoadBalancer service instead of Ingress on OKE
+    enabled: true
+    className: nginx
+    host: ""              # leave empty to match any hostname
+    path: /
+    pathType: Prefix
+    annotations:
+      nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    tls:
+      - secretName: uds-tls   # kubectl create secret tls uds-tls --cert=tls.crt --key=tls.key

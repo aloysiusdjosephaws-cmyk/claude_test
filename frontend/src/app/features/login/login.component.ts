@@ -12,7 +12,7 @@ import { AuthService } from '../../core/auth.service';
     <div class="login-page">
       <div class="login-card">
         <div class="login-header">
-          <h1>Application Manager</h1>
+          <h1>UDS — Upload Download Service</h1>
           <p>Sign in to continue</p>
         </div>
         <div class="login-body">

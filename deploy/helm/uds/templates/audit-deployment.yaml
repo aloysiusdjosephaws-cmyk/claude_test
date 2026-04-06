@@ -1,19 +1,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "fullstack-app.fullname" . }}-audit
+  name: {{ include "uds.fullname" . }}-audit
   labels:
-    {{- include "fullstack-app.labels" . | nindent 4 }}
-    {{- include "fullstack-app.audit.selectorLabels" . | nindent 4 }}
+    {{- include "uds.labels" . | nindent 4 }}
+    {{- include "uds.audit.selectorLabels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.audit.replicaCount }}
   selector:
     matchLabels:
-      {{- include "fullstack-app.audit.selectorLabels" . | nindent 6 }}
+      {{- include "uds.audit.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "fullstack-app.audit.selectorLabels" . | nindent 8 }}
+        {{- include "uds.audit.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -53,4 +53,4 @@ spec:
       volumes:
         - name: hsqldb-storage
           persistentVolumeClaim:
-            claimName: {{ include "fullstack-app.fullname" . }}-auditdb
+            claimName: {{ include "uds.fullname" . }}-auditdb

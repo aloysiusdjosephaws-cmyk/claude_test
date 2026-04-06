@@ -13,7 +13,7 @@ import { ApiService } from '../../core/api.service';
     <div class="page">
       <!-- Header -->
       <div class="header">
-        <span class="app-name">Application Manager ⚙</span>
+        <span class="app-name">UDS ⚙</span>
         <div class="tabs">
           <button class="tab-btn" [class.active]="activeTab==='users'" (click)="activeTab='users'">Users</button>
           <button class="tab-btn" [class.active]="activeTab==='assignments'" (click)="activeTab='assignments';loadApps()">App Assignments</button>

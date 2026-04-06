@@ -2,17 +2,18 @@ terraform {
   required_providers {
     oci = {
       source  = "oracle/oci"
-      version = "~> 5.0"
+      version = "~> 6.0"
     }
   }
 }
 
 provider "oci" {
-  tenancy_ocid     = var.tenancy_ocid
-  user_ocid        = var.user_ocid
-  fingerprint      = var.fingerprint
-  private_key_path = var.private_key_path
-  region           = var.region
+  tenancy_ocid         = var.tenancy_ocid
+  user_ocid            = var.user_ocid
+  fingerprint          = var.fingerprint
+  private_key_path     = var.private_key_path
+  private_key_password = var.private_key_password
+  region               = var.region
 }
 
 # ─── Data sources ─────────────────────────────────────────────────────────────
@@ -21,46 +22,9 @@ data "oci_identity_availability_domains" "ads" {
   compartment_id = var.tenancy_ocid
 }
 
-data "oci_core_images" "node_image" {
-  compartment_id           = var.compartment_ocid
-  operating_system         = "Oracle Linux"
-  operating_system_version = "8"
-  shape                    = var.node_shape
-  sort_by                  = "TIMECREATED"
-  sort_order               = "DESC"
-}
-
-# ─── VCN ──────────────────────────────────────────────────────────────────────
-
-resource "oci_core_vcn" "oke_vcn" {
-  compartment_id = var.compartment_ocid
-  cidr_block     = "10.0.0.0/16"
-  display_name   = "app-manager-oke-vcn"
-  dns_label      = "okecluster"
-}
-
-# ─── Gateways ─────────────────────────────────────────────────────────────────
-
-resource "oci_core_internet_gateway" "igw" {
-  compartment_id = var.compartment_ocid
-  vcn_id         = oci_core_vcn.oke_vcn.id
-  display_name   = "app-manager-igw"
-  enabled        = true
-}
-
-resource "oci_core_nat_gateway" "nat" {
-  compartment_id = var.compartment_ocid
-  vcn_id         = oci_core_vcn.oke_vcn.id
-  display_name   = "app-manager-nat"
-}
-
-resource "oci_core_service_gateway" "sgw" {
-  compartment_id = var.compartment_ocid
-  vcn_id         = oci_core_vcn.oke_vcn.id
-  display_name   = "app-manager-sgw"
-  services {
-    service_id = data.oci_core_services.all.services[0].id
-  }
+data "oci_containerengine_node_pool_option" "main" {
+  node_pool_option_id = "all"
+  compartment_id      = var.compartment_ocid
 }
 
 data "oci_core_services" "all" {
@@ -71,12 +35,45 @@ data "oci_core_services" "all" {
   }
 }
 
+# ─── VCN ──────────────────────────────────────────────────────────────────────
+
+resource "oci_core_vcn" "oke_vcn" {
+  compartment_id = var.compartment_ocid
+  cidr_block     = "10.0.0.0/16"
+  display_name   = "uds-oke-vcn"
+  dns_label      = "udscluster"
+}
+
+# ─── Gateways ─────────────────────────────────────────────────────────────────
+
+resource "oci_core_internet_gateway" "igw" {
+  compartment_id = var.compartment_ocid
+  vcn_id         = oci_core_vcn.oke_vcn.id
+  display_name   = "uds-igw"
+  enabled        = true
+}
+
+resource "oci_core_nat_gateway" "nat" {
+  compartment_id = var.compartment_ocid
+  vcn_id         = oci_core_vcn.oke_vcn.id
+  display_name   = "uds-nat"
+}
+
+resource "oci_core_service_gateway" "sgw" {
+  compartment_id = var.compartment_ocid
+  vcn_id         = oci_core_vcn.oke_vcn.id
+  display_name   = "uds-sgw"
+  services {
+    service_id = data.oci_core_services.all.services[0].id
+  }
+}
+
 # ─── Route tables ─────────────────────────────────────────────────────────────
 
 resource "oci_core_route_table" "public" {
   compartment_id = var.compartment_ocid
   vcn_id         = oci_core_vcn.oke_vcn.id
-  display_name   = "app-manager-public-rt"
+  display_name   = "uds-public-rt"
 
   route_rules {
     destination       = "0.0.0.0/0"
@@ -87,7 +84,7 @@ resource "oci_core_route_table" "public" {
 resource "oci_core_route_table" "private" {
   compartment_id = var.compartment_ocid
   vcn_id         = oci_core_vcn.oke_vcn.id
-  display_name   = "app-manager-private-rt"
+  display_name   = "uds-private-rt"
 
   route_rules {
     destination       = "0.0.0.0/0"
@@ -95,7 +92,7 @@ resource "oci_core_route_table" "private" {
   }
 
   route_rules {
-    destination       = "all-services"
+    destination       = data.oci_core_services.all.services[0].cidr_block
     destination_type  = "SERVICE_CIDR_BLOCK"
     network_entity_id = oci_core_service_gateway.sgw.id
   }
@@ -103,18 +100,18 @@ resource "oci_core_route_table" "private" {
 
 # ─── Security lists ───────────────────────────────────────────────────────────
 
-# Public subnet — API endpoint + load balancers
+# Public subnet — Kubernetes API endpoint + OCI Load Balancers (nginx ingress)
 resource "oci_core_security_list" "public" {
   compartment_id = var.compartment_ocid
   vcn_id         = oci_core_vcn.oke_vcn.id
-  display_name   = "app-manager-public-sl"
+  display_name   = "uds-public-sl"
 
   egress_security_rules {
     destination = "0.0.0.0/0"
     protocol    = "all"
   }
 
-  # Kubernetes API
+  # Kubernetes API — external kubectl access
   ingress_security_rules {
     protocol = "6"
     source   = "0.0.0.0/0"
@@ -124,7 +121,37 @@ resource "oci_core_security_list" "public" {
     }
   }
 
-  # Load balancer HTTP/HTTPS
+  # Kubernetes API — worker node to control plane
+  ingress_security_rules {
+    protocol = "6"
+    source   = "10.0.2.0/24"
+    tcp_options {
+      min = 6443
+      max = 6443
+    }
+  }
+
+  # OKE node registration (control plane ↔ worker)
+  ingress_security_rules {
+    protocol = "6"
+    source   = "10.0.2.0/24"
+    tcp_options {
+      min = 12250
+      max = 12250
+    }
+  }
+
+  # ICMP path discovery from worker nodes
+  ingress_security_rules {
+    protocol = "1"
+    source   = "10.0.2.0/24"
+    icmp_options {
+      type = 3
+      code = 4
+    }
+  }
+
+  # HTTP — nginx ingress load balancer
   ingress_security_rules {
     protocol = "6"
     source   = "0.0.0.0/0"
@@ -134,6 +161,7 @@ resource "oci_core_security_list" "public" {
     }
   }
 
+  # HTTPS — nginx ingress load balancer
   ingress_security_rules {
     protocol = "6"
     source   = "0.0.0.0/0"
@@ -148,14 +176,14 @@ resource "oci_core_security_list" "public" {
 resource "oci_core_security_list" "private" {
   compartment_id = var.compartment_ocid
   vcn_id         = oci_core_vcn.oke_vcn.id
-  display_name   = "app-manager-private-sl"
+  display_name   = "uds-private-sl"
 
   egress_security_rules {
     destination = "0.0.0.0/0"
     protocol    = "all"
   }
 
-  # Worker node to API endpoint
+  # kubelet (worker → API endpoint)
   ingress_security_rules {
     protocol = "6"
     source   = "10.0.0.0/16"
@@ -165,6 +193,7 @@ resource "oci_core_security_list" "private" {
     }
   }
 
+  # node-to-node communication
   ingress_security_rules {
     protocol = "6"
     source   = "10.0.0.0/16"
@@ -174,7 +203,7 @@ resource "oci_core_security_list" "private" {
     }
   }
 
-  # Worker node to worker node (all traffic within VCN)
+  # All intra-VCN traffic (node-to-node, LB health checks)
   ingress_security_rules {
     protocol = "all"
     source   = "10.0.0.0/16"
@@ -197,7 +226,7 @@ resource "oci_core_subnet" "public" {
   compartment_id    = var.compartment_ocid
   vcn_id            = oci_core_vcn.oke_vcn.id
   cidr_block        = "10.0.1.0/24"
-  display_name      = "app-manager-public-subnet"
+  display_name      = "uds-public-subnet"
   dns_label         = "public"
   route_table_id    = oci_core_route_table.public.id
   security_list_ids = [oci_core_security_list.public.id]
@@ -207,11 +236,21 @@ resource "oci_core_subnet" "private" {
   compartment_id             = var.compartment_ocid
   vcn_id                     = oci_core_vcn.oke_vcn.id
   cidr_block                 = "10.0.2.0/24"
-  display_name               = "app-manager-private-subnet"
+  display_name               = "uds-private-subnet"
   dns_label                  = "private"
   prohibit_public_ip_on_vnic = true
   route_table_id             = oci_core_route_table.private.id
   security_list_ids          = [oci_core_security_list.private.id]
+}
+
+# ─── Node image — picked from cluster's valid sources ─────────────────────────
+# Filters out ARM (aarch64) images when using x86 shapes (E4.Flex).
+# For A1.Flex (ARM), change the condition to: can(regex("aarch64", s.source_name))
+
+locals {
+  # Oracle-Linux-8.10-2025.09.16-0-OKE-1.32.1-1330 (Phoenix, x86)
+  # Update this if you change region or kubernetes_version
+  node_image_id = "ocid1.image.oc1.phx.aaaaaaaaz327oacj6n5byynkvsx7aro2cv6p3ak7jnrypuw2srtboqnee2aa"
 }
 
 # ─── OKE Cluster ──────────────────────────────────────────────────────────────
@@ -219,7 +258,7 @@ resource "oci_core_subnet" "private" {
 resource "oci_containerengine_cluster" "oke" {
   compartment_id     = var.compartment_ocid
   kubernetes_version = var.kubernetes_version
-  name               = "app-manager"
+  name               = "uds"
   vcn_id             = oci_core_vcn.oke_vcn.id
 
   endpoint_config {
@@ -242,7 +281,7 @@ resource "oci_containerengine_node_pool" "workers" {
   cluster_id         = oci_containerengine_cluster.oke.id
   compartment_id     = var.compartment_ocid
   kubernetes_version = var.kubernetes_version
-  name               = "app-manager-workers"
+  name               = "uds-workers"
   node_shape         = var.node_shape
 
   node_shape_config {
@@ -251,7 +290,7 @@ resource "oci_containerengine_node_pool" "workers" {
   }
 
   node_source_details {
-    image_id    = data.oci_core_images.node_image.images[0].id
+    image_id    = local.node_image_id
     source_type = "IMAGE"
   }
 
@@ -266,3 +305,4 @@ resource "oci_containerengine_node_pool" "workers" {
 
   ssh_public_key = var.ssh_public_key
 }
+

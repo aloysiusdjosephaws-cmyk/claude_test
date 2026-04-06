@@ -2,10 +2,10 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "fullstack-app.fullname" . }}-frontend
+  name: {{ include "uds.fullname" . }}-frontend
   labels:
-    {{- include "fullstack-app.labels" . | nindent 4 }}
-    {{- include "fullstack-app.frontend.selectorLabels" . | nindent 4 }}
+    {{- include "uds.labels" . | nindent 4 }}
+    {{- include "uds.frontend.selectorLabels" . | nindent 4 }}
   {{- with .Values.frontend.ingress.annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
@@ -19,14 +19,16 @@ spec:
     {{- toYaml .Values.frontend.ingress.tls | nindent 4 }}
   {{- end }}
   rules:
-    - host: {{ .Values.frontend.ingress.host | quote }}
+    - {{- if .Values.frontend.ingress.host }}
+      host: {{ .Values.frontend.ingress.host | quote }}
+      {{- end }}
       http:
         paths:
           - path: {{ .Values.frontend.ingress.path }}
             pathType: {{ .Values.frontend.ingress.pathType }}
             backend:
               service:
-                name: {{ include "fullstack-app.fullname" . }}-frontend
+                name: {{ include "uds.fullname" . }}-frontend
                 port:
                   name: http
 {{- end }}

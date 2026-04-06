@@ -1,19 +1,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "fullstack-app.fullname" . }}-doc-mgmt
+  name: {{ include "uds.fullname" . }}-doc-mgmt
   labels:
-    {{- include "fullstack-app.labels" . | nindent 4 }}
-    {{- include "fullstack-app.docMgmt.selectorLabels" . | nindent 4 }}
+    {{- include "uds.labels" . | nindent 4 }}
+    {{- include "uds.docMgmt.selectorLabels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.documentManagement.replicaCount }}
   selector:
     matchLabels:
-      {{- include "fullstack-app.docMgmt.selectorLabels" . | nindent 6 }}
+      {{- include "uds.docMgmt.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "fullstack-app.docMgmt.selectorLabels" . | nindent 8 }}
+        {{- include "uds.docMgmt.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -53,4 +53,4 @@ spec:
       volumes:
         - name: hsqldb-storage
           persistentVolumeClaim:
-            claimName: {{ include "fullstack-app.fullname" . }}-docdb
+            claimName: {{ include "uds.fullname" . }}-docdb

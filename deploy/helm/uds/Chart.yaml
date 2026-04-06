@@ -1,6 +1,6 @@
 apiVersion: v2
-name: fullstack-app
-description: Application Manager — Spring Boot microservices + Angular 19 + HSQLDB
+name: uds
+description: UDS (Upload Download Service) — Spring Boot microservices + Angular 19 + HSQLDB
 type: application
 version: 0.1.0
 appVersion: "0.0.1"
@@ -8,6 +8,6 @@ keywords:
   - spring-boot
   - angular
   - microservices
-  - application-manager
+  - uds
 maintainers:
   - name: claude_test

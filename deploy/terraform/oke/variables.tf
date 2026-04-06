@@ -18,6 +18,13 @@ variable "private_key_path" {
   type        = string
 }
 
+variable "private_key_password" {
+  description = "Passphrase for the encrypted OCI API signing private key (leave empty if key is not encrypted)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "region" {
   description = "OCI region (e.g. us-phoenix-1, ap-sydney-1)"
   type        = string
@@ -62,3 +69,4 @@ variable "node_count" {
   type        = number
   default     = 1
 }
+
