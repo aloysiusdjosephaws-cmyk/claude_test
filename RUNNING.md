@@ -457,3 +457,65 @@ limit_req_zone $binary_remote_addr zone=login:10m rate=5r/m;
 limit_req zone=login burst=3 nodelay;
 ```
 Then rebuild and push the frontend image.
+
+
+APPENDIX:
+Cost Estimate:
+● Good — 4 PVCs: 3 × 1GB + 1 × 5GB = 8GB total. Very cheap.
+
+  ---
+  Cost Estimate
+
+  Node pool = 0 (paused):
+
+  ┌──────────────────────────────────────────────────────┬──────────────┐
+  │                       Resource                       │     Cost     │
+  ├──────────────────────────────────────────────────────┼──────────────┤
+  │ OKE control plane                                    │ Free         │
+  ├──────────────────────────────────────────────────────┼──────────────┤
+  │ 4 block volumes (8GB total)                          │ ~$0.20/month │
+  ├──────────────────────────────────────────────────────┼──────────────┤
+  │ NLB (stays running, you'd need kubectl to delete it) │ ~$5.84/month │
+  ├──────────────────────────────────────────────────────┼──────────────┤
+  │ Total paused                                         │ ~$6/month    │
+  └──────────────────────────────────────────────────────┴──────────────┘
+
+  Node pool = 1 (running, VM.Standard3.Flex 2OCPU/8GB):
+
+  ┌────────────────────────┬──────────────┐
+  │        Resource        │     Cost     │
+  ├────────────────────────┼──────────────┤
+  │ Compute (2 OCPU + 8GB) │ ~$44/month   │
+  ├────────────────────────┼──────────────┤
+  │ NLB                    │ ~$5.84/month │
+  ├────────────────────────┼──────────────┤
+  │ Block volumes          │ ~$0.20/month │
+  ├────────────────────────┼──────────────┤
+  │ Total running          │ ~$50/month   │
+  └────────────────────────┴──────────────┘
+
+  So if you run it 5 days/month and have it off the rest: ~$6 + (5/30 × $44) ≈ ~$13/month.
+
+  ---
+  Console Steps
+
+  To pause (node pool → 0)
+
+  1. OCI Console → Kubernetes Clusters (OKE)
+  2. Click your cluster → Node Pools tab
+  3. Click your node pool → Edit
+  4. Change Number of nodes from 1 to 0
+  5. Click Save changes
+
+  Wait ~2 minutes. All pods stop, compute billing stops. Your data (PVCs) is safe.
+
+  To resume (node pool → 1)
+
+  1. Same path: OCI Console → OKE → cluster → Node Pools → Edit
+  2. Change Number of nodes from 0 to 1
+  3. Click Save changes
+
+  Wait ~3-4 minutes for node to become Ready, then all pods restart automatically (Kubernetes reschedules them). App
+  will be accessible at the same NLB IP as before.
+
+  ▎ Note: The NLB IP stays the same as long as you don't delete the ingress-nginx helm release.
