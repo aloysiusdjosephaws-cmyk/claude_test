@@ -302,6 +302,10 @@ Update `deploy/helm/uds/values-oci.yaml` — replace `YOUR_REGION`, `YOUR_NAMESP
 ```bash
 JWT_SECRET=$(openssl rand -hex 32)
 INTERNAL_API_KEY=$(openssl rand -hex 16)
+(or)
+kubectl get secrets
+JWT_SECRET=$(kubectl get secret uds-tls -o jsonpath='{.data.JWT_SECRET}' | base64 -d 2>/dev/null)
+INTERNAL_API_KEY=$(kubectl get secret uds-tls -o jsonpath='{.data.INTERNAL_API_KEY}' | base64 -d 2>/dev/null)
 
 helm upgrade --install uds ./deploy/helm/uds \
   -f ./deploy/helm/uds/values-oci.yaml \
@@ -318,6 +322,7 @@ helm upgrade --install uds ./deploy/helm/uds \
 ### Step 7 — Access the App
 
 ```
+kubectl get svc -n ingress-nginx ingress-nginx-controller
 https://<nlb-external-ip>
 ```
 
