@@ -7,6 +7,8 @@ metadata:
     {{- include "uds.userMgmt.selectorLabels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.userManagement.replicaCount }}
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       {{- include "uds.userMgmt.selectorLabels" . | nindent 6 }}

@@ -2,9 +2,36 @@
 
 Two supported deployment targets:
 - **Local** — Minikube + Helm (no cloud account needed)
-- **OCI** — OKE + Helm (nginx ingress NLB with self-signed TLS)
+- **OCI** — OKE + Helm (nginx ingress with OCI Load Balancer and self-signed TLS)
 
 Both targets run the same Helm chart and the same Docker images. The only differences are the image registry, storage class, and TLS on OCI.
+
+---
+
+## Switching Between Local and OCI
+
+All `kubectl` and `helm` commands are run from your **local laptop** — never from a cloud VM. They talk to whichever cluster your kubeconfig is currently pointing to.
+
+Check which cluster you are currently connected to:
+```bash
+kubectl config current-context
+```
+
+Switch between targets:
+```bash
+# Point kubectl at local minikube
+kubectl config use-context minikube
+
+# Point kubectl at OCI OKE (context name from your kubeconfig)
+kubectl config use-context <oke-context-name>
+```
+
+To see all available contexts:
+```bash
+kubectl config get-contexts
+```
+
+> Always confirm your current context before running `helm upgrade` or `kubectl` commands to avoid accidentally deploying to the wrong environment.
 
 ---
 
@@ -26,7 +53,7 @@ The database starts empty. Before you can log in you must create a SUPER_USER vi
 
 Run this after all pods are running:
 - Local: replace `<HOST>` with `localhost`
-- OCI: replace `<HOST>` with the NLB IP, and `http` with `https`
+- OCI: replace `<HOST>` with the OCI LB IP, and `http` with `https`
 
 ```bash
 curl -X POST http://<HOST>/api/users \
@@ -135,7 +162,18 @@ helm uninstall uds                        # tear down all resources
 minikube stop                             # stop the cluster
 minikube delete                           # delete the cluster entirely
 ```
-
+  ┌─────────────────┬─────────────────────────────────────────────────────────┐
+  │     Command     │                         Effect                          │
+  ├─────────────────┼─────────────────────────────────────────────────────────┤
+  │ minikube stop   │ Pauses cluster, everything preserved                    │
+  ├─────────────────┼─────────────────────────────────────────────────────────┤
+  │ minikube start  │ Resumes, pods restart automatically                     │
+  ├─────────────────┼─────────────────────────────────────────────────────────┤
+  │ minikube tunnel │ Exposes ingress to localhost (needed to access the app) │
+  ├─────────────────┼─────────────────────────────────────────────────────────┤
+  │ minikube delete │ Wipes everything — full rebuild needed                  │
+  └─────────────────┴─────────────────────────────────────────────────────────┘
+  
 ### Rebuild After Code Changes
 
 ```bash
@@ -212,19 +250,16 @@ oci ce cluster create-kubeconfig --cluster-id <cluster-id> \
   --token-version 2.0.0 --kube-endpoint PUBLIC_ENDPOINT
 ```
 
-Install the nginx ingress controller using a **Network Load Balancer** (NLB).
-NLB operates at Layer 4 (TCP passthrough), allowing nginx to terminate TLS directly.
-This is required for cert-manager compatibility when upgrading to a CA-signed cert later.
+Install the nginx ingress controller. OCI will automatically provision a standard **OCI Load Balancer** (Layer 7) for the ingress service — no special annotation required.
 
 ```bash
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm repo update
 helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
-  --namespace ingress-nginx --create-namespace \
-  --set controller.service.annotations."oci\.oraclecloud\.com/load-balancer-type"=nlb
+  --namespace ingress-nginx --create-namespace
 ```
 
-Wait for the NLB to get an external IP (2-3 minutes):
+Wait for the OCI Load Balancer to get an external IP (2-3 minutes):
 ```bash
 kubectl get svc -n ingress-nginx ingress-nginx-controller
 # Wait until EXTERNAL-IP shows a real IP address
@@ -323,10 +358,10 @@ helm upgrade --install uds ./deploy/helm/uds \
 
 ```
 kubectl get svc -n ingress-nginx ingress-nginx-controller
-https://<nlb-external-ip>
+https://<lb-external-ip>
 ```
 
-Accept the browser certificate warning (self-signed cert — see Step 3). The nginx ingress handles everything over HTTPS:
+Accept the browser certificate warning (self-signed cert — see Step 3). The OCI Load Balancer forwards traffic to nginx ingress, which handles everything over HTTPS:
 - `https://ip/` → Angular SPA (JS/CSS cached in browser for 1 year)
 - `https://ip/api/*` → proxied to backend microservices (ClusterIP, not internet-accessible)
 
@@ -335,7 +370,7 @@ Accept the browser certificate warning (self-signed cert — see Step 3). The ng
 When you have a domain name, upgrading to a free Let's Encrypt certificate is a three-step change — no downtime, no image rebuild:
 
 ```bash
-# 1. Point an A record at your domain → NLB IP
+# 1. Point an A record at your domain → OCI LB IP
 
 # 2. Install cert-manager
 helm repo add jetstack https://charts.jetstack.io && helm repo update
@@ -468,17 +503,17 @@ Cost Estimate:
 
   Node pool = 0 (paused):
 
-  ┌──────────────────────────────────────────────────────┬──────────────┐
-  │                       Resource                       │     Cost     │
-  ├──────────────────────────────────────────────────────┼──────────────┤
-  │ OKE control plane                                    │ Free         │
-  ├──────────────────────────────────────────────────────┼──────────────┤
-  │ 4 block volumes (8GB total)                          │ ~$0.20/month │
-  ├──────────────────────────────────────────────────────┼──────────────┤
-  │ NLB (stays running, you'd need kubectl to delete it) │ ~$5.84/month │
-  ├──────────────────────────────────────────────────────┼──────────────┤
-  │ Total paused                                         │ ~$6/month    │
-  └──────────────────────────────────────────────────────┴──────────────┘
+  ┌──────────────────────────────────────────────────────────┬──────────────┐
+  │                         Resource                         │     Cost     │
+  ├──────────────────────────────────────────────────────────┼──────────────┤
+  │ OKE control plane                                        │ Free         │
+  ├──────────────────────────────────────────────────────────┼──────────────┤
+  │ 4 block volumes (8GB total)                              │ ~$0.20/month │
+  ├──────────────────────────────────────────────────────────┼──────────────┤
+  │ OCI Load Balancer (stays running; delete with helm stop) │ ~$4.38/month │
+  ├──────────────────────────────────────────────────────────┼──────────────┤
+  │ Total paused                                             │ ~$5/month    │
+  └──────────────────────────────────────────────────────────┴──────────────┘
 
   Node pool = 1 (running, VM.Standard3.Flex 2OCPU/8GB):
 
@@ -487,14 +522,14 @@ Cost Estimate:
   ├────────────────────────┼──────────────┤
   │ Compute (2 OCPU + 8GB) │ ~$44/month   │
   ├────────────────────────┼──────────────┤
-  │ NLB                    │ ~$5.84/month │
+  │ OCI Load Balancer      │ ~$4.38/month │
   ├────────────────────────┼──────────────┤
   │ Block volumes          │ ~$0.20/month │
   ├────────────────────────┼──────────────┤
-  │ Total running          │ ~$50/month   │
+  │ Total running          │ ~$49/month   │
   └────────────────────────┴──────────────┘
 
-  So if you run it 5 days/month and have it off the rest: ~$6 + (5/30 × $44) ≈ ~$13/month.
+  So if you run it 5 days/month and have it off the rest: ~$5 + (5/30 × $44) ≈ ~$12/month.
 
   ---
   Console Steps
@@ -516,6 +551,6 @@ Cost Estimate:
   3. Click Save changes
 
   Wait ~3-4 minutes for node to become Ready, then all pods restart automatically (Kubernetes reschedules them). App
-  will be accessible at the same NLB IP as before.
+  will be accessible at the same LB IP as before.
 
-  ▎ Note: The NLB IP stays the same as long as you don't delete the ingress-nginx helm release.
+  ▎ Note: The OCI LB IP stays the same as long as you don't delete the ingress-nginx helm release.

@@ -12,7 +12,7 @@ A Spring Boot microservices + Angular 19 application for managing file uploads a
 | Auth       | JWT (HS256, shared secret across all services)      |
 | Proxy      | Nginx (serves Angular + proxies `/api/*` to backends) |
 | Local      | Minikube + Helm (`deploy/helm/uds/values-local.yaml`) |
-| OCI        | OKE + NLB (nginx ingress, self-signed TLS) + Helm (`deploy/helm/uds/values-oci.yaml`) |
+| OCI        | OKE + OCI Load Balancer (nginx ingress, self-signed TLS) + Helm (`deploy/helm/uds/values-oci.yaml`) |
 
 ## User Roles
 
@@ -79,9 +79,9 @@ A Spring Boot microservices + Angular 19 application for managing file uploads a
 - Images built locally inside minikube's Docker daemon (`eval $(minikube docker-env)`)
 - Angular built with `NG_CONFIG=development` — calls `/api/*` (relative), nginx proxies to backends
 
-### OCI — OKE + NLB
+### OCI — OKE + OCI Load Balancer
 - Terraform (`deploy/terraform/oke/`) provisions OKE cluster and VCN
-- nginx ingress installed with OCI Network Load Balancer (NLB) for TLS passthrough
+- nginx ingress installed with OCI Load Balancer (Layer 7) — nginx terminates TLS
 - Self-signed TLS cert stored as K8s secret `uds-tls` — nginx terminates TLS
 - Helm deploys all services with OCIR images and `oci-bv` storage
 - Angular built with `NG_CONFIG=production` — same `/api/*` nginx proxy approach as local

@@ -79,7 +79,7 @@ Browser
    │
    ▼
 ┌─────────────────────────────────────────────────────┐
-│   nginx Ingress (minikube / OCI Load Balancer)       │
+│   nginx Ingress (minikube addon / OCI Load Balancer)  │
 │   Routes all traffic to the frontend Service         │
 └─────────────────────────┬───────────────────────────┘
                           │
@@ -132,10 +132,10 @@ Minikube runs a single-node Kubernetes cluster on your machine. The `minikube tu
 ### OCI (OKE)
 
 ```
-Browser → https://<nlb-ip>
-                    │ (TLS passthrough)
+Browser → https://<lb-ip>
+                    │ (HTTPS)
                     ▼
-         OCI Network Load Balancer (NLB)
+         OCI Load Balancer (Layer 7)
                     │ (TCP, port 443)
                     ▼
          nginx ingress pod (terminates TLS)
@@ -146,12 +146,77 @@ Browser → https://<nlb-ip>
                /api/* proxied to backend pods
 ```
 
-OKE (Oracle Container Engine for Kubernetes) is Oracle's managed Kubernetes service. An nginx ingress controller is installed using an OCI Network Load Balancer (NLB), which passes TCP connections straight through to nginx. nginx terminates TLS using a certificate stored as a Kubernetes secret, then serves the Angular SPA and proxies API calls — same as local from that point on.
+OKE (Oracle Container Engine for Kubernetes) is Oracle's managed Kubernetes service. An nginx ingress controller is installed and OCI automatically provisions a standard OCI Load Balancer (Layer 7) for it. The Load Balancer forwards traffic to nginx ingress, which terminates TLS using a certificate stored as a Kubernetes secret, then serves the Angular SPA and proxies API calls — same as local from that point on.
 
-Backend services are `ClusterIP` type — they have no public IP and are only reachable from within the cluster. The NLB is the sole public entry point.
+Backend services are `ClusterIP` type — they have no public IP and are only reachable from within the cluster. The OCI Load Balancer is the sole public entry point.
 
 The Terraform in `deploy/terraform/oke/` provisions the OKE cluster and its networking.
 
+Note:
+● 1. Angular → Backend (Browser calls)
+
+  Angular (in browser) calls /api/documents
+           │
+           ▼
+  https://129.146.71.63/api/documents
+           │
+           ▼
+  OCI Load Balancer → nginx ingress → frontend pod nginx
+           │
+           strips /api, proxies to document-management-service:8083
+           │
+           ▼
+  JSON response back to browser
+
+  Caching: API responses are not cached by the browser. Each Angular action (load documents, search, etc.) makes a fresh
+   HTTP call. Only the static files (Angular JS/CSS) are cached long-term. JSON data is always fetched live.
+
+  ---
+  2. Backend → Backend (Service-to-service calls)
+
+  These never go through the browser, LB, or nginx. They talk directly via Kubernetes DNS inside the cluster:
+
+  document-management-service
+           │
+           │  POST http://audit-service:8084/audit/events
+           ▼
+  audit-service (ClusterIP)
+
+  application-management-service
+           │
+           │  GET http://user-management-service:8081/users/{id}
+           ▼
+  user-management-service (ClusterIP)
+
+  Kubernetes resolves audit-service to the pod IP automatically. Traffic stays entirely inside the cluster — plain HTTP,
+   no TLS, no LB, no internet. This is why the backend services are ClusterIP type — they have no external IP by design.
+
+  ---
+  Summary
+
+  ┌───────────────────┬─────────────────────────────────────────────────────────┬─────┬────────┐
+  │     Call type     │                          Path                           │ TLS │ Cached │
+  ├───────────────────┼─────────────────────────────────────────────────────────┼─────┼────────┤
+  │ Browser → backend │ Browser → LB → nginx ingress → frontend nginx → backend │ Yes │ No     │
+  ├───────────────────┼─────────────────────────────────────────────────────────┼─────┼────────┤
+  │ Backend → backend │ Direct via K8s DNS                                      │ No  │ N/A    │
+  └───────────────────┴─────────────────────────────────────────────────────────┴─────┴────────┘
+
+The frontend pod is involved because that's where the /api/* proxy logic lives — in frontend/nginx.conf.
+  The nginx inside the frontend pod does two jobs:
+
+  1. Serves static Angular files
+  2. Proxies /api/* to backend services
+
+  So the path for an API call is:
+
+  OCI LB → nginx ingress → frontend pod nginx → backend pod
+
+  nginx ingress routes ALL traffic to the frontend pod (it only knows about one service). The frontend nginx then
+  decides:
+  - Is this /api/*? → proxy to the right backend
+  - Is this anything else? → serve the Angular static file
+  
 ---
 
 ## Part 6 — Authentication & Security
