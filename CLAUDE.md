@@ -11,7 +11,7 @@ A Spring Boot microservices + Angular 19 application for managing file uploads a
 | Database   | HSQLDB (file-based, separate PVC per service)       |
 | Auth       | JWT (HS256, shared secret across all services)      |
 | Proxy      | Nginx (serves Angular + proxies `/api/*` to backends) |
-| Local      | Minikube + Helm (`deploy/helm/uds/values-local.yaml`) |
+| Local      | Rancher Desktop (containerd) + Helm (`deploy/helm/uds/values-local.yaml`) |
 | OCI        | OKE + OCI Load Balancer (nginx ingress, self-signed TLS) + Helm (`deploy/helm/uds/values-oci.yaml`) |
 
 ## User Roles
@@ -34,7 +34,7 @@ A Spring Boot microservices + Angular 19 application for managing file uploads a
 │   │   └── uds/
 │   │       ├── Chart.yaml
 │   │       ├── values.yaml           # base config for all 5 services
-│   │       ├── values-local.yaml     # minikube overrides (local images, standard storage)
+│   │       ├── values-local.yaml     # Rancher Desktop overrides (local registry, local-path storage)
 │   │       ├── values-oci.yaml       # OKE overrides (OCIR images, oci-bv storage)
 │   │       └── templates/
 │   │           ├── _helpers.tpl
@@ -74,9 +74,9 @@ A Spring Boot microservices + Angular 19 application for managing file uploads a
 
 ## Deployment Targets
 
-### Local — Minikube
-- nginx ingress controller (minikube addon) exposes the app on `http://localhost`
-- Images built locally inside minikube's Docker daemon (`eval $(minikube docker-env)`)
+### Local — Rancher Desktop
+- Traefik ingress (built into k3s) exposes the app on `http://localhost`
+- Images built with `nerdctl -n k8s.io build` directly into the k8s.io containerd namespace; `imagePullPolicy: Never`
 - Angular built with `NG_CONFIG=development` — calls `/api/*` (relative), nginx proxies to backends
 
 ### OCI — OKE + OCI Load Balancer

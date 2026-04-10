@@ -1,7 +1,7 @@
 # UDS — Running & Deployment Guide
 
 Two supported deployment targets:
-- **Local** — Minikube + Helm (no cloud account needed)
+- **Local** — Rancher Desktop + Helm (no cloud account needed)
 - **OCI** — OKE + Helm (nginx ingress with OCI Load Balancer and self-signed TLS)
 
 Both targets run the same Helm chart and the same Docker images. The only differences are the image registry, storage class, and TLS on OCI.
@@ -19,8 +19,8 @@ kubectl config current-context
 
 Switch between targets:
 ```bash
-# Point kubectl at local minikube
-kubectl config use-context minikube
+# Point kubectl at local Rancher Desktop cluster
+kubectl config use-context rancher-desktop
 
 # Point kubectl at OCI OKE (context name from your kubeconfig)
 kubectl config use-context <oke-context-name>
@@ -74,18 +74,15 @@ Then open the UI, log in as `admin` / `Admin@123`, and create other users from t
 
 ---
 
-## Local — Minikube
+## Local — Rancher Desktop
 
 ### Prerequisites
 
-| Tool | Install |
-|------|---------|
-| minikube | https://minikube.sigs.k8s.io/docs/start |
-| kubectl | https://kubernetes.io/docs/tasks/tools |
-| helm 3 | https://helm.sh/docs/intro/install |
-| docker | https://docs.docker.com/engine/install |
+| Tool | How you get it |
+|------|----------------|
+| Rancher Desktop | Install the Windows app from rancherdesktop.io — provides kubectl, helm, and nerdctl automatically in WSL2 |
 
-**WSL2 users** — set memory before starting minikube. Edit `C:\Users\<username>\.wslconfig`:
+**WSL2 users** — set memory before starting Rancher Desktop. Edit `C:\Users\<username>\.wslconfig`:
 ```ini
 [wsl2]
 memory=12GB
@@ -93,37 +90,28 @@ processors=4
 ```
 Then run `wsl --shutdown` from Windows CMD/PowerShell and reopen your terminal.
 
-### Step 1 — Start Minikube
+### One-Time Setup (first use only)
+
+**In Rancher Desktop (Windows app):**
+1. Preferences → Container Engine → select **containerd**
+2. Preferences → WSL → enable your Ubuntu distro
+3. Restart Rancher Desktop
+
+That's it. Traefik ingress is built into k3s — no ingress controller installation needed.
+
+### Step 1 — Build Images
+
+Build all images directly into the k8s.io containerd namespace so k3s can use them without a registry pull. Run from the project root in your **Ubuntu WSL2 terminal**:
 
 ```bash
-minikube start --cpus=4 --memory=8192
-minikube addons enable ingress
+nerdctl -n k8s.io build --no-cache --build-arg NG_CONFIG=development -t frontend-client:local ./frontend
+nerdctl -n k8s.io build --no-cache -t audit-service:local                  ./services/audit-service
+nerdctl -n k8s.io build --no-cache -t user-management-service:local        ./services/user-management-service
+nerdctl -n k8s.io build --no-cache -t application-management-service:local ./services/application-management-service
+nerdctl -n k8s.io build --no-cache -t document-management-service:local    ./services/document-management-service
 ```
 
-Wait for the ingress addon to be ready:
-```bash
-kubectl get pods -n ingress-nginx
-```
-
-### Step 2 — Build Images Inside Minikube
-
-Point your Docker CLI at minikube's internal daemon so images are available to the cluster without pushing to a registry:
-
-```bash
-eval $(minikube docker-env)
-```
-
-Build all images from the project root:
-
-```bash
-docker build --no-cache --build-arg NG_CONFIG=development -t frontend-client:local ./frontend
-docker build --no-cache -t audit-service:local                  ./services/audit-service
-docker build --no-cache -t user-management-service:local        ./services/user-management-service
-docker build --no-cache -t application-management-service:local ./services/application-management-service
-docker build --no-cache -t document-management-service:local    ./services/document-management-service
-```
-
-### Step 3 — Deploy with Helm
+### Step 2 — Deploy with Helm
 
 Generate secrets once and reuse — all 4 services must share the same `JWT_SECRET`:
 
@@ -143,14 +131,9 @@ helm upgrade --install uds ./deploy/helm/uds \
   --set documentManagement.env.INTERNAL_API_KEY=$INTERNAL_API_KEY
 ```
 
-### Step 4 — Access the UI
+### Step 3 — Access the UI
 
-In a separate terminal (keep it running):
-```bash
-minikube tunnel
-```
-
-Then open **http://localhost** in your browser.
+Open **http://localhost** in your browser. No tunnel needed — Rancher Desktop exposes ingress on localhost directly.
 
 ### Useful Commands
 
@@ -159,28 +142,25 @@ kubectl get pods                          # check all pods are Running
 kubectl logs -l app.kubernetes.io/name=uds-frontend --tail=50
 kubectl logs -l app.kubernetes.io/name=uds-user-mgmt --tail=50
 helm uninstall uds                        # tear down all resources
-minikube stop                             # stop the cluster
-minikube delete                           # delete the cluster entirely
 ```
-  ┌─────────────────┬─────────────────────────────────────────────────────────┐
-  │     Command     │                         Effect                          │
-  ├─────────────────┼─────────────────────────────────────────────────────────┤
-  │ minikube stop   │ Pauses cluster, everything preserved                    │
-  ├─────────────────┼─────────────────────────────────────────────────────────┤
-  │ minikube start  │ Resumes, pods restart automatically                     │
-  ├─────────────────┼─────────────────────────────────────────────────────────┤
-  │ minikube tunnel │ Exposes ingress to localhost (needed to access the app) │
-  ├─────────────────┼─────────────────────────────────────────────────────────┤
-  │ minikube delete │ Wipes everything — full rebuild needed                  │
-  └─────────────────┴─────────────────────────────────────────────────────────┘
+
+Rancher Desktop cluster lifecycle is managed from the Windows app (quit to stop, reopen to resume). The cluster and all pods persist across restarts.
+
+  ┌──────────────────────────────────┬───────────────────────────────────────────────────────┐
+  │             Action               │                        Effect                         │
+  ├──────────────────────────────────┼───────────────────────────────────────────────────────┤
+  │ Quit Rancher Desktop             │ Stops cluster; everything preserved                   │
+  ├──────────────────────────────────┼───────────────────────────────────────────────────────┤
+  │ Open Rancher Desktop             │ Resumes cluster; pods restart automatically           │
+  ├──────────────────────────────────┼───────────────────────────────────────────────────────┤
+  │ Factory Reset (Preferences menu) │ Wipes cluster entirely — full rebuild needed          │
+  └──────────────────────────────────┴───────────────────────────────────────────────────────┘
   
 ### Rebuild After Code Changes
 
 ```bash
-eval $(minikube docker-env)
-
 # Rebuild only the changed image, e.g. frontend:
-docker build --no-cache --build-arg NG_CONFIG=development -t frontend-client:local ./frontend
+nerdctl -n k8s.io build --no-cache --build-arg NG_CONFIG=development -t frontend-client:local ./frontend
 
 # Restart the deployment to pick up the new image:
 kubectl rollout restart deployment -l app.kubernetes.io/name=uds-frontend
@@ -443,14 +423,19 @@ terraform destroy
 ```bash
 kubectl describe pod <pod-name>
 ```
-Usually a storage class mismatch. Local needs `standard`, OKE needs `oci-bv`. Check your values file.
+Usually a storage class mismatch. Local needs `local-path`, OKE needs `oci-bv`. Check your values file.
 
-**Images not found (local)**
+**`ImagePullBackOff` (local)**
 
-You forgot to run `eval $(minikube docker-env)` before building. The images were built in your host Docker, not minikube's. Re-run:
+With containerd + `pullPolicy: Never`, this means the image wasn't built into the k8s.io namespace. Rebuild:
 ```bash
-eval $(minikube docker-env)
-docker build ...
+nerdctl -n k8s.io build --no-cache -t <service>:local ./services/<service>
+kubectl rollout restart deployment -l app.kubernetes.io/name=uds-<service>
+```
+
+Verify the image exists in the k8s.io namespace:
+```bash
+nerdctl -n k8s.io images | grep local
 ```
 
 **`ImagePullBackOff` (OCI)**
@@ -472,10 +457,6 @@ kubectl logs <pod-name>
 **JWT errors / login fails**
 
 The 4 services have different `JWT_SECRET` values — this happens if you ran `openssl rand` separately for each `--set`. Generate once and reuse (see deployment commands above).
-
-**minikube tunnel needed**
-
-Without `minikube tunnel`, the ingress LoadBalancer has no external IP. Keep it running in a separate terminal while you use the app.
 
 **Browser certificate warning (OCI)**
 

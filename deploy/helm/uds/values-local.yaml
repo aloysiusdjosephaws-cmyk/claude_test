@@ -1,16 +1,19 @@
-# Local minikube overrides — used alongside values.yaml
+# Local Rancher Desktop overrides — used alongside values.yaml
 # See RUNNING.md for the full local deployment walkthrough.
 #
-# Quick reference:
-#   minikube start --cpus=4 --memory=8192
-#   minikube addons enable ingress
-#   eval $(minikube docker-env)
-#   docker build --build-arg NG_CONFIG=development -t frontend-client:local ./frontend
-#   docker build -t user-management-service:local        ./services/user-management-service
-#   docker build -t application-management-service:local ./services/application-management-service
-#   docker build -t document-management-service:local    ./services/document-management-service
-#   docker build -t audit-service:local                  ./services/audit-service
+# ── One-time setup ────────────────────────────────────────────────────────────
+#   1. In Rancher Desktop: Preferences > Container Engine > select "containerd"
+#   2. Enable WSL Integration: Preferences > WSL > enable your Ubuntu distro
+#   (Traefik ingress is built into k3s — no ingress install needed)
 #
+# ── Build images (from project root, Ubuntu WSL2 terminal) ───────────────────
+#   nerdctl -n k8s.io build --build-arg NG_CONFIG=development -t frontend-client:local ./frontend
+#   nerdctl -n k8s.io build -t user-management-service:local        ./services/user-management-service
+#   nerdctl -n k8s.io build -t application-management-service:local ./services/application-management-service
+#   nerdctl -n k8s.io build -t document-management-service:local    ./services/document-management-service
+#   nerdctl -n k8s.io build -t audit-service:local                  ./services/audit-service
+#
+# ── Deploy ────────────────────────────────────────────────────────────────────
 #   JWT_SECRET=$(openssl rand -hex 32)
 #   INTERNAL_API_KEY=$(openssl rand -hex 16)
 #   helm upgrade --install uds ./deploy/helm/uds \
@@ -24,51 +27,54 @@
 #     --set documentManagement.env.JWT_SECRET=$JWT_SECRET \
 #     --set documentManagement.env.INTERNAL_API_KEY=$INTERNAL_API_KEY
 #
-# Access: http://localhost  (minikube tunnel in a separate terminal)
+# Access: http://localhost  (no tunnel needed — Rancher Desktop exposes ingress directly)
 
-# ─── Images — use locally built tags, never pull from registry ───────────────
+# ─── Images — built directly into containerd k8s.io namespace via nerdctl ────
 audit:
   image:
+    repository: audit-service
     tag: local
     pullPolicy: Never
   hsqldb:
     storage:
-      storageClassName: standard
+      storageClassName: local-path
 
 userManagement:
   image:
+    repository: user-management-service
     tag: local
     pullPolicy: Never
   hsqldb:
     storage:
-      storageClassName: standard
+      storageClassName: local-path
 
 applicationManagement:
   image:
+    repository: application-management-service
     tag: local
     pullPolicy: Never
   hsqldb:
     storage:
-      storageClassName: standard
+      storageClassName: local-path
 
 documentManagement:
   image:
+    repository: document-management-service
     tag: local
     pullPolicy: Never
   hsqldb:
     storage:
-      storageClassName: standard
+      storageClassName: local-path
 
-# ─── Frontend — nginx ingress on localhost ────────────────────────────────────
+# ─── Frontend — Traefik ingress (built into k3s) on localhost ─────────────────
 frontend:
   image:
+    repository: frontend-client
     tag: local
     pullPolicy: Never
   ingress:
     enabled: true
-    className: nginx
+    className: traefik
     host: ""          # empty = match any host, access via http://localhost
     path: /
     pathType: Prefix
-    annotations:
-      nginx.ingress.kubernetes.io/ssl-redirect: "false"

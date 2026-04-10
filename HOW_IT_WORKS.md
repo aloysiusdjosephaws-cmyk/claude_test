@@ -78,10 +78,10 @@ The chart is identical; only the values file changes (image registry, storage cl
 Browser
    │
    ▼
-┌─────────────────────────────────────────────────────┐
-│   nginx Ingress (minikube addon / OCI Load Balancer)  │
-│   Routes all traffic to the frontend Service         │
-└─────────────────────────┬───────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│   Traefik Ingress (local) / nginx + OCI Load Balancer (OCI)    │
+│   Routes all traffic to the frontend Service                    │
+└─────────────────────────┬───────────────────────────────────────┘
                           │
                           ▼
 ┌─────────────────────────────────────────────────────┐
@@ -113,13 +113,13 @@ The browser never calls the backend services directly. All API calls go to `/api
 
 ## Part 5 — Local vs OCI
 
-### Local (Minikube)
+### Local (Rancher Desktop)
 
 ```
 Browser → http://localhost
             │
             ▼
-    minikube nginx ingress
+    Traefik ingress (built into k3s)
             │
             ▼
     frontend pod (nginx)
@@ -127,7 +127,7 @@ Browser → http://localhost
       /api/* proxied to backend pods
 ```
 
-Minikube runs a single-node Kubernetes cluster on your machine. The `minikube tunnel` command makes the ingress accessible at `http://localhost`. Images are built directly into minikube's Docker daemon so they never need to be pushed to a registry.
+Rancher Desktop runs a single-node Kubernetes cluster (k3s) on your machine, exposing ingress on `http://localhost` directly — no tunnel needed. Images are built with `nerdctl -n k8s.io build` directly into containerd's k8s.io namespace, so k3s can use them immediately with `imagePullPolicy: Never` — no registry required.
 
 ### OCI (OKE)
 
@@ -253,7 +253,7 @@ Each service has its own HSQLDB database — a lightweight, file-based Java data
 | Document Management | `/data/docdb` | Document metadata, file BLOBs, groups |
 | Audit | `/data/auditdb` | Audit event log |
 
-On OCI, these are backed by OCI Block Volumes (`storageClassName: oci-bv`). Locally, they use minikube's built-in storage (`storageClassName: standard`).
+On OCI, these are backed by OCI Block Volumes (`storageClassName: oci-bv`). Locally, they use Rancher Desktop's built-in storage (`storageClassName: local-path`).
 
 ---
 
